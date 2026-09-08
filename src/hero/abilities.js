@@ -4,6 +4,7 @@
 import { SLOTS, R_UNLOCK_LEVEL } from './heroData.js';
 import * as lib from './abilityLib.js';
 import * as ext from './abilityLibExt.js';
+import { applyStatus as applyStat, clearStatus as clearStat } from './statusExt.js';
 
 const MARK_POOL = 32;
 const EPS = 1e-6;          // countdowns snap to 0 so float drift never costs a frame
@@ -20,6 +21,8 @@ export class AbilitySystem {
     this.cast = { slot: '', timer: 0, def: null };               // wind-up in progress
     this.dash = { active: false, dx: 0, dz: 0, remaining: 0, def: null };
     this.field = { active: false, timer: 0, x: 0, z: 0, def: null };
+    // Ground zone (Earthbreaker's slow field, Deluge): sim-side timer is authoritative.
+    this.zone = { active: false, timer: 0, x: 0, z: 0, def: null, acc: 0, rec: null };
     this.stunTimer = 0;
     this.slowTimer = 0; this.slowPct = 0;
     this.hasteTimer = 0; this.hastePct = 0;
@@ -202,6 +205,8 @@ export class AbilitySystem {
           this.cast.def = null;
           this.cast.timer = 0;
           lib.resolveWindup(hero, this, def, aimX, aimZ);
+          // Earthbreaker leaves its slow field behind at the hero's feet.
+          if (def.zone) ext.startZone(hero, this, def.zone, hero.pos.x, hero.pos.z);
           this.startCooldown(def.slot);
         }
       }
@@ -214,6 +219,7 @@ export class AbilitySystem {
         lib.landField(hero, this, this.field.def, this.field.x, this.field.z);
       }
     }
+    if (this.zone.active) ext.tickZone(hero, this, dt);
   }
 
   // Veil leaves stealth (expiry, attack or cast) — the resolver lives in ext.
@@ -222,34 +228,11 @@ export class AbilitySystem {
   // Public break (attack start, cast): same path as natural expiry.
   breakStealth() { if (this.stealthTimer > 0) this._endStealth(); }
 
-  // kind: 'stun' | 'slow' | 'haste' | 'shield'. Slows do not stack: strongest wins,
-  // an equal slow extends. Stun takes the longer remaining time.
+  // kind: 'stun' | 'slow' | 'haste' | 'shield' | 'root' | 'stealth' | 'attackSpeed' |
+  // 'armorBuff' | 'reflect' | 'bonusNextAuto'. Delegates to statusExt (kept there to
+  // hold this file under ~300 lines).
   applyStatus(kind, seconds, magnitude) {
-    if (kind === 'stun') {
-      if (seconds > this.stunTimer) this.stunTimer = seconds;
-    } else if (kind === 'slow') {
-      if (magnitude > this.slowPct) { this.slowPct = magnitude; this.slowTimer = seconds; }
-      else if (magnitude === this.slowPct && seconds > this.slowTimer) this.slowTimer = seconds;
-    } else if (kind === 'haste') {
-      if (magnitude >= this.hastePct) { this.hastePct = magnitude; if (seconds > this.hasteTimer) this.hasteTimer = seconds; }
-    } else if (kind === 'shield') {
-      this.hero.shield = magnitude;
-      this.shieldTimer = seconds;
-    } else if (kind === 'root') {
-      if (seconds > this.rootTimer) this.rootTimer = seconds;
-    } else if (kind === 'stealth') {
-      this.stealthTimer = seconds;
-    } else if (kind === 'attackSpeed') {
-      if (magnitude >= this.atkSpdPct) { this.atkSpdPct = magnitude; this.atkSpdTimer = seconds; }
-    } else if (kind === 'armorBuff') {
-      if (magnitude >= this.armorBuffVal) { this.armorBuffVal = magnitude; this.armorBuffTimer = seconds; this.hero.refreshArmor(); }
-    } else if (kind === 'reflect') {
-      this.reflectVal = magnitude;
-      this.reflectTimer = seconds;
-    } else if (kind === 'bonusNextAuto') {
-      this.bonusAutoDmg = magnitude;
-      this.bonusAutoTimer = seconds;
-    }
+    applyStat(this, kind, seconds, magnitude);
   }
 
   // --- marks (Ilyra passive) ------------------------------------------------
@@ -292,27 +275,7 @@ export class AbilitySystem {
 
   // Death: statuses, shield, marks and any cast/dash/telegraph in progress go away.
   // Cooldowns are untouched — they keep ticking while dead (tickCooldowns).
-  clearStatus() {
-    this.stunTimer = 0;
-    this.slowTimer = 0; this.slowPct = 0;
-    this.hasteTimer = 0; this.hastePct = 0;
-    this.shieldTimer = 0;
-    this.rootTimer = 0;
-    this.stealthTimer = 0;
-    this.stealthHaste = 0;
-    this.strikeUnit = null; this.strikeUntil = 0;
-    this.atkSpdTimer = 0; this.atkSpdPct = 0;
-    this.armorBuffTimer = 0; this.armorBuffVal = 0;
-    this.reflectTimer = 0; this.reflectVal = 0;
-    this.bonusAutoTimer = 0; this.bonusAutoDmg = 0;
-    this.autoSlowTimer = 0; this.autoSlowPct = 0; this.autoSlowTime = 0;
-    this.hero.refreshArmor();
-    this.hero.shield = 0;
-    this.cast.def = null; this.cast.timer = 0; this.cast.slot = '';
-    this.dash.active = false;
-    this.field.active = false;
-    for (let i = 0; i < this.marks.length; i++) { this.marks[i].unit = null; this.marks[i].t = 0; }
-  }
+  clearStatus() { clearStat(this); }
 
   // Match reset.
   resetAll() {

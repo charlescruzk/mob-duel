@@ -37,9 +37,15 @@ export class Unit {
 
   // Returns the HP actually removed (0 when refused). dtype: 'physical' | 'magic' | 'true'.
   // 'true' ignores armor and shields. Source is the Unit that owns the damage instance
-  // (hero for abilities/autos, minion, tower) or null (fountain laser).
-  takeDamage(amount, source, dtype = 'physical') {
+  // (hero for abilities/autos, minion, tower) or null (fountain laser). `reflected`
+  // marks damage returned by a Stonewall-style reflect so reflected damage is itself
+  // never reflected (no loops) and skips mitigation on the way out.
+  takeDamage(amount, source, dtype = 'physical', reflected = false) {
     if (!this.alive || this.invulnerable || amount <= 0) return 0;
+    if (!reflected && source && this.abilities && this.abilities.reflectTimer > 0 &&
+        typeof source.takeDamage === 'function') {
+      source.takeDamage(amount * this.abilities.reflectVal, this, 'magic', true);
+    }
     let dmg = dtype === 'true' ? amount : amount * (1 - this.armor);
     if (dtype !== 'true' && this.shield > 0) {
       const absorbed = dmg < this.shield ? dmg : this.shield;

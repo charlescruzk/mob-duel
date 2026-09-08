@@ -1,12 +1,15 @@
-// Effects — pooled projectiles and short-lived rings. One shared instance (`effects`)
-// that a Hero attaches to the scene/world on construction; main/match calls
-// `effects.update(dt)` after world.update(dt). Pools are built once; spawning after
-// that allocates nothing. Projectiles carry their owner's onHit(projectile, unit)
-// callback (bind it ONCE in the owner's constructor — never a fresh closure per cast).
+// Effects — pooled projectiles, short-lived rings and ground zones. One shared
+// instance (`effects`) that a Hero attaches to the scene/world on construction;
+// main/match calls `effects.update(dt)` after world.update(dt). Pools are built
+// once; spawning after that allocates nothing. Projectiles carry their owner's
+// onHit(projectile, unit) callback (bind it ONCE in the owner's constructor —
+// never a fresh closure per cast).
 import * as THREE from 'three';
 
 const PROJECTILE_POOL = 48;
 const RING_POOL = 24;
+const ZONE_POOL = 4;
+const ZONE_Y = 0.04;
 const SUBSTEP = 0.3;            // m per swept sub-step so a 30 m/s lance cannot skip a minion
 const PROJECTILE_Y = 1.0;
 
@@ -42,6 +45,17 @@ class Ring {
   }
 }
 
+// A ground zone's visible disc (Earthbreaker's slow field, Deluge). Lifetime and
+// position live on the sim side (AbilitySystem.zone); the mesh only fades.
+class Zone {
+  constructor(mesh) {
+    this.active = false;
+    this.mesh = mesh;
+    this.life = 0;
+    this.maxLife = 0;
+  }
+}
+
 export class Effects {
   constructor() {
     this.scene = null;
@@ -49,6 +63,7 @@ export class Effects {
     this.group = new THREE.Group();
     this.projectiles = [];
     this.rings = [];
+    this.zones = [];
     this._built = false;
   }
 
@@ -83,6 +98,17 @@ export class Effects {
       m.visible = false;
       this.group.add(m);
       this.rings.push(new Ring(m));
+    }
+    const disc = new THREE.CircleGeometry(1, 32);
+    for (let i = 0; i < ZONE_POOL; i++) {
+      const m = new THREE.Mesh(disc, new THREE.MeshBasicMaterial({
+        color: 0xffffff, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false,
+      }));
+      m.rotation.x = -Math.PI / 2;
+      m.position.y = ZONE_Y;
+      m.visible = false;
+      this.group.add(m);
+      this.zones.push(new Zone(m));
     }
   }
 
@@ -133,6 +159,25 @@ export class Effects {
     return r;
   }
 
+  // Ground zone disc. The sim's zone timer is authoritative (startZone/endZone in
+  // abilityLibExt.js); `life` here only drives the fade, and the returned Zone is
+  // kept by the caller so it can end the disc early.
+  spawnZone(pos, radius, life, color = 0xffffff) {
+    let z = null;
+    for (let i = 0; i < this.zones.length; i++) if (!this.zones[i].active) { z = this.zones[i]; break; }
+    if (!z) return null;
+    z.active = true;
+    z.life = life;
+    z.maxLife = life;
+    z.mesh.visible = true;
+    z.mesh.scale.set(radius, radius, 1);
+    z.mesh.position.x = pos.x;
+    z.mesh.position.z = pos.z;
+    z.mesh.material.color.setHex(color);
+    z.mesh.material.opacity = 0.3;
+    return z;
+  }
+
   _freeProjectile() {
     const list = this.projectiles;
     for (let i = 0; i < list.length; i++) if (!list[i].active) return list[i];
@@ -170,6 +215,14 @@ export class Effects {
       r.life -= dt;
       if (r.life <= 0) { r.active = false; r.mesh.visible = false; continue; }
       r.mesh.material.opacity = 0.8 * (r.life / r.maxLife);
+    }
+    const zones = this.zones;
+    for (let i = 0; i < zones.length; i++) {
+      const z = zones[i];
+      if (!z.active) continue;
+      z.life -= dt;
+      if (z.life <= 0) { z.active = false; z.mesh.visible = false; continue; }
+      z.mesh.material.opacity = 0.3 * (0.4 + 0.6 * (z.life / z.maxLife));
     }
   }
 
@@ -240,6 +293,7 @@ export class Effects {
   reset() {
     for (let i = 0; i < this.projectiles.length; i++) if (this.projectiles[i].active) this._release(this.projectiles[i]);
     for (let i = 0; i < this.rings.length; i++) { this.rings[i].active = false; this.rings[i].mesh.visible = false; }
+    for (let i = 0; i < this.zones.length; i++) { this.zones[i].active = false; this.zones[i].mesh.visible = false; }
   }
 }
 

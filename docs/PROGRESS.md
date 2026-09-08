@@ -297,6 +297,61 @@ state; sim code never imports `fx/`.
 - Not verifiable by the probe: hood/cowl readability; how readable 0.35 opacity is in
   practice; whether blink-behind feels responsive at 1.2 m.
 
+### Task 5 — Halvard the Wall
+
+- [x] Hero data (`heroData.js`): hp 700/95, mp 230/22, regen 2.2/0.9, AD 55/5,
+      armor 0.20/0.012, melee, moveSpeed 5.0. Passive **Unyielding**: below 30 % HP
+      +0.15 armor (additive, before the 0.75 cap).
+- [x] Stats refactor: `recomputeStats` + new `refreshArmor` extracted to
+      `src/hero/heroStats.js`; `hero.update` calls `refreshArmor()` every frame so
+      Unyielding tracks HP live (armor reverts when healed above the threshold).
+- [x] Q **Shield Bash** (`targeted`): nearest enemy within 2.5 m of the reticle —
+      damage then 1 s stun (stun applied *after* the strike so the bash itself can't
+      benefit from Opportunist-style bonuses).
+- [x] W **Stonewall** (`buff`): +0.20 armor for 4 s and a 15 % reflect. Reflect fires
+      in `Unit.takeDamage` *before* mitigation: the attacker takes 15 % of the
+      pre-mitigation amount as magic, synchronously, flagged `reflected` so reflects
+      never chain. Stacks with Brakk's shield (separate status).
+- [x] E **Charge** (`dash` + `knockback`): the FIRST enemy hero within the ability's
+      radius stops the dash, takes the damage and is knocked 2.5 m along the dash over
+      0.2 s (`heroKnock.js` — knocked units move even while stunned) + stunned 0.4 s.
+      The landing AoE fires only when the dash completes without a hero hit. Knock
+      step is capped at the remaining distance so the knock never overshoots `dist`.
+- [x] R **Earthbreaker** (`windup` → `aoeStun` + zone): 0.5 s wind-up, r5 damage +
+      1.2 s stun, then a 3 s zone disc (new `effects` zone pool) that re-applies a
+      40 % slow every frame (strongest-wins). The zone dies with its caster
+      (`clearStatus` → `endZone`).
+- [x] Status plumbing: `applyStatus`/`clearStatus` extracted to `src/hero/statusExt.js`
+      (abilities.js delegates); `sys.zone` state + `startZone`/`endZone`/`tickZone` in
+      `abilityLibExt.js`; knockback displacement in `heroKnock.js`; file map updated in
+      ARCHITECTURE.md.
+- [x] Bot kit + mesh: tower-shield plate + crest, trim 0x8a9aa8; BOT_KIT entry with
+      q/w/e/r costs, ranges and radii for the bot's cast heuristics.
+- Assumptions (spec silent):
+  - Dash stops on the first enemy hero contact and skips the landing AoE in that case.
+  - Knock displacement runs while stunned (CC gate order) — knocked heroes can't act
+    but do travel.
+  - Zone slow re-applies each frame with a short (0.5 s) duration rather than ticking
+    damage; zone has no damage per tick.
+  - Unyielding lives in the per-frame `refreshArmor` rather than an armor getter, so
+    item/level changes and the cap interact in one place.
+  - Reflect triggers on *any* pre-mitigation damage taken (autos and abilities), and
+    reflected damage itself cannot re-reflect.
+- Probe lessons recorded for later tasks: zero `mpRegen`/`hpRegen` for exact windows;
+  `fresh(h)` does not clear `prevIntent`, so an `edge()` on the same key right after a
+  `fresh()` is swallowed — step once between them. A heroData entry missing a numeric
+  field breaks page boot silently (probe prints exceptions before the restarts).
+- Probe: new block `halvard: shield bash, stonewall reflect, charge knockback,
+  earthbreaker zone, unyielding` via `restart('hero=halvard&enemy=ilyra&lowfx=1')` —
+  9 assertions, **122/122 total** (was 113), exit 0, no code errors. Two game bugs
+  found by the probe: the dash hit-detection passed the knockback object's (missing)
+  `radius` to `nearestEnemy` — an undefined maxDist makes the distance test NaN and
+  the dash never detected contact; and knockTick overshot `dist` by one step when the
+  duration divided evenly into dt.
+- Not verifiable by the probe: whether the 2.5 m knock reads as a *hit-stop shove*
+  rather than a slide; how oppressive the 40 % zone slow feels; shield-plate silhouette
+  readability from behind.
+
 ## Known gaps, deliberately not in the slice
 
 - Multiplayer. `docs/NETCODE.md` is the decision: server-authoritative at 20 Hz, intents

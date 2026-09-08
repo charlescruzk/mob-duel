@@ -7,12 +7,13 @@ import { distXZ } from '../core/physics.js';
 import { POSITIONS, RADII, enemyOf, isInFountain } from '../map/laneData.js';
 import {
   HEROES, SLOTS, atLevel, respawnTime, MAX_LEVEL, XP_TO_LEVEL, XP_SHARE_RADIUS,
-  FOUNTAIN_REGEN_PCT, FOUNTAIN_LASER_DPS, CDR_CAP, HERO_KILL_GOLD,
-  ATTR, ARMOR_CAP, ATTACK_SPEED_CAP,
+  FOUNTAIN_REGEN_PCT, FOUNTAIN_LASER_DPS, HERO_KILL_GOLD,
 } from './heroData.js';
 import { AbilitySystem } from './abilities.js';
 import { BasicAttack } from './heroAttack.js';
 import { applyItemTo, refreshItemStats, ITEM_KEYS } from './heroItems.js';
+import { recomputeStats, refreshArmor } from './heroStats.js';
+import { knockTick, knockClear } from './heroKnock.js';
 import { buildHeroMesh, applyStealthFade } from './heroMesh.js';
 import * as recall from './heroRecall.js';
 import { effects } from './effects.js';
@@ -52,6 +53,7 @@ export class Hero extends Unit {
     this.potionHpRate = 0; this.potionHpTimer = 0;      // consumable HoTs (consumables.js ticks)
     this.potionMpRate = 0; this.potionMpTimer = 0;
     this.headhunterCount = 0; this.headhunterTarget = null;   // Headhunter passive (heroAttack)
+    this.knockDx = 0; this.knockDz = 0; this.knockSpeed = 0; this.knockTime = 0;   // knockback (heroKnock.js)
     this.goldValue = HERO_KILL_GOLD;
     this.respawnTimer = 0;
     this.isRecalling = false; this.recallTimer = 0;
@@ -90,40 +92,21 @@ export class Hero extends Unit {
   ready(slot) { return this.abilities.ready(slot); }
 
   recomputeStats() {
-    const d = this.data, L = this.level, s = this.itemStats, A = ATTR;
-    this.maxHp = atLevel(d.hp, L) + s.maxHp + s.str * A.strMaxHp;
-    this.maxMp = atLevel(d.mp, L) + s.maxMp + s.int * A.intMaxMp;
-    this.hpRegen = atLevel(d.hpRegen, L) + s.hpRegen + s.str * A.strHpRegen;
-    this.mpRegen = atLevel(d.mpRegen, L) + s.mpRegen + s.int * A.intMpRegen;
-    this.moveSpeed = d.moveSpeed + s.moveSpeed;
-    const p = d.primary;
-    const attr = p === 'str' ? s.str : p === 'agi' ? s.agi : s.int;   // primary only (§2)
-    this.attackDamage = atLevel(d.attackDamage, L) + s.attackDamage + attr;
-    this.abilityAmp = s.abilityAmp + s.int * A.intAmp;
-    this.cdr = s.cdr > CDR_CAP ? CDR_CAP : s.cdr;
-    let as = s.attackSpeedPct + s.agi * A.agiAttackSpeed;   // buffs stack on top (§2)
-    if (as > ATTACK_SPEED_CAP) as = ATTACK_SPEED_CAP;
-    this.itemAttackSpeed = as;
-    this.lifesteal = s.lifesteal;
-    this.levelArmor = atLevel(d.armor, L);
-    this.itemArmor = s.armor + s.agi * A.agiArmor;
-    this.refreshArmor();
-    if (this.hp > this.maxHp) this.hp = this.maxHp;
-    if (this.mp > this.maxMp) this.mp = this.maxMp;
+    recomputeStats(this);
   }
 
-  // Armor = level + items/agility + the strongest armor buff, total capped at 75%.
-  // abilities.js calls this when its buff is applied or expires.
+  // Armor = level + items/agility + the strongest armor buff + Unyielding, total
+  // capped at 75%. abilities.js calls this when its buff is applied or expires;
+  // hero.update refreshes it every frame so the passive tracks HP live.
   refreshArmor() {
-    let a = this.levelArmor + this.itemArmor + this.abilities.armorBuff;
-    if (a > ARMOR_CAP) a = ARMOR_CAP;
-    this.armor = a;
+    refreshArmor(this);
   }
 
   // --- per-frame ---------------------------------------------------------
 
   update(dt, intent = this.intent, world = this.world) {
     const sys = this.abilities;
+    this.refreshArmor();      // Unyielding tracks HP live
     this._regen(dt);
     if (isInFountain(this.pos, enemyOf(this.team))) {
       this.takeDamage(FOUNTAIN_LASER_DPS * dt, null, 'true');
@@ -133,6 +116,7 @@ export class Hero extends Unit {
     const az = intent ? intent.aimZ : this.pos.z;
     sys.update(dt, world, ax, az);
     if (!this.alive) return;
+    knockTick(this, dt);      // knocked units move even while stunned
     if (sys.stunned) { this.cancelRecall(); this.attack.interrupt(); }
     if (intent) {
       this._edges(intent, ax, az);
@@ -211,6 +195,7 @@ export class Hero extends Unit {
     this.cancelRecall();
     this.potionHpRate = this.potionHpTimer = this.potionMpRate = this.potionMpTimer = 0;
     this.headhunterCount = 0; this.headhunterTarget = null;
+    knockClear(this);
     this.abilities.clearStatus();
     this.attack.reset();
     if (this.shieldMesh) this.shieldMesh.visible = false;
@@ -288,6 +273,7 @@ export class Hero extends Unit {
     this.passives.length = 0;
     this.potionHpRate = this.potionHpTimer = this.potionMpRate = this.potionMpTimer = 0;
     this.headhunterCount = 0; this.headhunterTarget = null;
+    knockClear(this);
     this.abilities.resetAll();
     this.attack.reset();
     this.isRecalling = false; this.recallTimer = 0;

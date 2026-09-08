@@ -37,7 +37,9 @@ src/
     abilities.js           cooldown/mana/cast-state machine per slot                HERO
     abilityLib.js          the eight ability behaviours (Q/W/E/R × 2)               HERO
     abilityLibExt.js       the new Phase 2 shapes (buff, targeted, cone, zone…)     HERO
-    statusExt.js           extra hero status kinds if abilities.js runs out of room HERO
+    statusExt.js           applyStatus/clearStatus extracted from abilities.js      HERO
+    heroStats.js           recomputeStats + refreshArmor (Unyielding) from hero.js  HERO
+    heroKnock.js           knockback displacement (Charge) — moves while stunned    HERO
     effects.js             projectiles, telegraphs, dash/blink motion, marks        HERO
   camera/
     thirdPerson.js         ThirdPersonCamera rig                                  (scaffold)

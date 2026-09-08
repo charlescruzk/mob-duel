@@ -7,7 +7,7 @@ import { RADII, HEIGHTS, TEAM_COLOR } from '../map/laneData.js';
 
 const BODY_R = RADII.hero * 0.84;
 
-const TRIM = { brakk: 0x6b6b6b, ilyra: 0xf2c84b, vaskra: 0x9fd6ff, kesh: 0xb06be0 };
+const TRIM = { brakk: 0x6b6b6b, ilyra: 0xf2c84b, vaskra: 0x9fd6ff, kesh: 0xb06be0, halvard: 0x8a9aa8 };
 
 export function buildHeroMesh(heroKey, team) {
   const color = TEAM_COLOR[team];
@@ -30,6 +30,14 @@ export function buildHeroMesh(heroKey, team) {
     const pads = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.22, 0.5), trimMat);
     pads.position.y = HEIGHTS.hero - 0.5;
     g.add(pads);
+  } else if (heroKey === 'halvard') {
+    // Wall: a tower shield plate on the left flank and a crested helm.
+    const shieldPlate = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.3, 0.85), trimMat);
+    shieldPlate.position.set(-0.5, HEIGHTS.hero * 0.55, 0);
+    g.add(shieldPlate);
+    const crest = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.3, 0.5), trimMat);
+    crest.position.y = HEIGHTS.hero - 0.05;
+    g.add(crest);
   } else if (heroKey === 'vaskra') {
     // Longshot: a brimmed scout cap and a bow held out to the right.
     const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, 0.14, 10), trimMat);

@@ -224,9 +224,62 @@ export const HEROES = {
       },
     },
   },
+
+  halvard: {
+    key: 'halvard',
+    name: 'Halvard',
+    title: 'the Wall',
+    role: 'melee tank',
+    primary: 'str',
+    ranged: false,
+    hp: { base: 700, step: 95 },
+    mp: { base: 230, step: 22 },
+    hpRegen: { base: 2.2, step: 0.25 },
+    mpRegen: { base: 0.9, step: 0.1 },
+    moveSpeed: 5.0,
+    attackRange: 2.0,
+    attackDamage: { base: 55, step: 5 },
+    attackInterval: 1.1,
+    windup: 0.3,
+    projectileSpeed: 0,
+    armor: { base: 0.20, step: 0.012 },
+    passive: {
+      key: 'p', name: 'Unyielding', kind: 'unyielding',
+      desc: 'Below 30% HP, +15% armor (additive, before the cap).',
+      threshold: 0.30, bonus: 0.15,
+    },
+    abilities: {
+      q: {
+        slot: 'q', name: 'Shield Bash', cost: 40, cd: 8.0, range: 2.5, shape: 'targeted',
+        damage: { base: 50, step: 14 }, stunTime: 1.0,
+        desc: 'Bash the enemy nearest the reticle (2.5 m): damage and a 1 s stun.',
+      },
+      w: {
+        slot: 'w', name: 'Stonewall', cost: 50, cd: 16.0, range: 0, shape: 'buff',
+        buffKind: 'armorBuff', buffTime: 4.0, buffPct: 0.20, reflectPct: 0.15,
+        desc: 'For 4 s: +0.20 armor and reflects 15% of pre-mitigation damage taken '
+          + 'back at the attacker as magic.',
+      },
+      e: {
+        slot: 'e', name: 'Charge', cost: 55, cd: 12.0, shape: 'dash',
+        speed: 18.0, minDist: 1.0, maxDist: 8.0, radius: 1.2,
+        knockback: { dist: 2.5, time: 0.2, stun: 0.4 }, damage: { base: 40, step: 10 },
+        desc: 'Dash up to 8 m. The first enemy hero hit is knocked back 2.5 m along '
+          + 'the dash and stunned 0.4 s.',
+      },
+      r: {
+        slot: 'r', name: 'Earthbreaker', cost: 100, cd: 65.0, range: 0, shape: 'windup',
+        windup: 0.5, resolve: 'aoeStun', radius: 5.0,
+        damage: { base: 120, step: 30 }, stunTime: 1.2,
+        zone: { radius: 5.0, duration: 3.0, slowPct: 0.40, slowTime: 0.5, color: 0x4a7fd6 },
+        desc: '0.5 s wind-up, then circle r5: damage and a 1.2 s knockup stun, leaving '
+          + 'a 3 s field that slows enemies inside by 40%.',
+      },
+    },
+  },
 };
 
-export const HERO_KEYS = ['brakk', 'ilyra', 'vaskra', 'kesh'];
+export const HERO_KEYS = ['brakk', 'ilyra', 'vaskra', 'kesh', 'halvard'];
 
 // Brakk ↔ Ilyra for the original pairing; every other hero bot-fills as Brakk until
 // hero select (Task 7) wires ?enemy=.

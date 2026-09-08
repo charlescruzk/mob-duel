@@ -12,12 +12,15 @@ const BLINK_BEHIND = 1.2;
 const VEIL_BONUS_TIME = 3.0;   // how long the first-attack-after-Veil bonus waits
 const pt = { x: 0, z: 0 };
 const cdir = { x: 0, z: 0 };
+const scratch = { x: 0, z: 0 };   // zone centre for enemiesInRadius
+const zoneHits = [];              // shared out-array for the zone tick
 const COLOR_DAMAGE = 0xffa040;
 const COLOR_BLINK = 0x9fd6ff;
 const COLOR_STEALTH = 0x9f6bd6;
 
 export function castBuff(hero, sys, def) {
   sys.applyStatus(def.buffKind, def.buffTime, def.buffPct);
+  if (def.reflectPct) sys.applyStatus('reflect', def.buffTime, def.reflectPct);
   if (def.autoSlowPct) {
     sys.autoSlowPct = def.autoSlowPct;
     sys.autoSlowTime = def.autoSlowTime;
@@ -133,6 +136,68 @@ export function castTargeted(hero, sys, def, aimX, aimZ) {
   sys.strikeUnit = t;
   sys.strikeUntil = hero.world ? hero.world.time + STRIKE_WINDOW : 0;
   lib.abilityHit(hero, sys, t, dmg);
+  // Shield Bash's stun rides the same targeted resolver (after the hit so the stun
+  // itself never boosts the strike's Opportunist window).
+  if (def.stunTime) lib.applyStatusTo(t, 'stun', def.stunTime, 1);
   effects.spawnRing(t.pos, 1.5, 0.3, COLOR_DAMAGE);
   return true;
+}
+
+// --- ground zones (Earthbreaker's slow field; Deluge reuses these) -------------
+
+// Start a zone under the hero (Earthbreaker) or at (x, z) (Deluge). The sim timer on
+// sys.zone is authoritative; the disc's fade in effects is cosmetic.
+export function startZone(hero, sys, zdef, x, z) {
+  const zn = sys.zone;
+  zn.active = true;
+  zn.timer = zdef.duration;
+  zn.x = x; zn.z = z;
+  zn.def = zdef;
+  zn.acc = 0;
+  zn.rec = effects.spawnZone(hero.pos, zdef.radius, zdef.duration, zdef.color || 0xffffff);
+  // spawnZone reads the mesh position from the passed object; set it exactly.
+  if (zn.rec) { zn.rec.mesh.position.x = x; zn.rec.mesh.position.z = z; }
+}
+
+export function endZone(sys) {
+  const zn = sys.zone;
+  if (zn.rec) { zn.rec.active = false; zn.rec.mesh.visible = false; zn.rec = null; }
+  zn.active = false;
+  zn.timer = 0;
+  zn.def = null;
+}
+
+// Per-frame zone tick: the slow reapplies each frame with a short duration so units
+// entering later are slowed too; an optional tick damage uses `acc` against
+// def.tickInterval. A healPct zone (Deluge) heals the caster while inside.
+export function tickZone(hero, sys, dt) {
+  const zn = sys.zone;
+  zn.timer -= dt;
+  if (zn.timer <= 0) { endZone(sys); return; }
+  const def = zn.def;
+  if (!def) return;
+  const world = hero.world;
+  if (!world) return;
+  scratch.x = zn.x; scratch.z = zn.z;
+  world.enemiesInRadius(scratch, hero.team, def.radius, zoneHits);
+  for (let i = 0; i < zoneHits.length; i++) {
+    const u = zoneHits[i];
+    if (u.kind === 'tower' || u.kind === 'nexus') continue;
+    if (def.slowPct) lib.applyStatusTo(u, 'slow', def.slowTime || 0.5, def.slowPct);
+    if (def.tickInterval) {
+      zn.acc += dt;
+      if (zn.acc >= def.tickInterval) {
+        zn.acc = 0;
+        lib.abilityHit(hero, sys, u, atLevel(def.tickDamage, hero.level) * (1 + hero.abilityAmp));
+      }
+    }
+  }
+  zoneHits.length = 0;
+  if (def.healPct) {
+    const dx = hero.pos.x - zn.x;
+    const dz = hero.pos.z - zn.z;
+    if (dx * dx + dz * dz <= def.radius * def.radius) {
+      hero.heal(def.healPct * hero.maxHp * dt);
+    }
+  }
 }

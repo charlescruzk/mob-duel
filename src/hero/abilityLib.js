@@ -5,6 +5,7 @@
 import { resolveCircleVsBoxes, clampToBounds } from '../core/physics.js';
 import { TEAM_COLOR } from '../map/laneData.js';
 import { atLevel } from './heroData.js';
+import { knockApply } from './heroKnock.js';
 import * as passives from '../economy/passives.js';
 import { effects } from './effects.js';
 
@@ -118,7 +119,10 @@ export function pushOutOfStatics(pos, radius, world) {
 }
 
 // Advances an active dash; walls, lane edge and statics stop it early. Returns true
-// on the frame it lands (the landing AoE has then been applied).
+// on the frame it lands (the landing AoE has then been applied). A dash with
+// `knockback` (Halvard's Charge) stops on the FIRST ENEMY HERO it touches: that
+// hero is damaged, displaced along the dash and stunned, and the landing AoE is
+// skipped (it fires only if the dash completes without hitting a hero).
 export function stepDash(hero, sys, world, dt) {
   const ds = sys.dash;
   let step = ds.def.speed * dt;
@@ -131,17 +135,36 @@ export function stepDash(hero, sys, world, dt) {
     if (world.boxes.length && resolveCircleVsBoxes(hero.pos, hero.radius, world.boxes)) stop = true;
     if (world.bounds && clampToBounds(hero.pos, hero.radius, world.bounds)) stop = true;
     if (pushOutOfStatics(hero.pos, hero.radius, world)) stop = true;
+    // The contact radius is the ability's own `radius` (knockback carries only
+    // dist/time/stun); undefined here would make nearestEnemy's d² test NaN.
+    if (ds.def.knockback && !stop && !ds.hitHero &&
+        world.nearestEnemy(hero.pos, hero.team, ds.def.radius, 'hero')) {
+      ds.hitHero = true;
+      stop = true;
+    }
   }
   if (!stop) return false;
   ds.active = false;
-  if (ds.def.noDamage) {
+  const dsDef = ds.def;
+  ds.hitHero = false;
+  if (dsDef.knockback && world) {
+    const v = world.nearestEnemy(hero.pos, hero.team, dsDef.radius, 'hero');
+    if (v) {
+      const kb = dsDef.knockback;
+      abilityHit(hero, sys, v, scaledDamage(hero, dsDef));
+      knockApply(v, ds.dx, ds.dz, kb.dist, kb.time);
+      applyStatusTo(v, 'stun', kb.stun, 1);
+      return true;
+    }
+  }
+  if (dsDef.noDamage) {
     // Hop abilities (Tumble): no landing damage; arm the next-auto bonus instead.
-    if (ds.def.bonusAuto) {
-      sys.applyStatus('bonusNextAuto', ds.def.bonusAutoTime, atLevel(ds.def.bonusAuto, hero.level));
+    if (dsDef.bonusAuto) {
+      sys.applyStatus('bonusNextAuto', dsDef.bonusAutoTime, atLevel(dsDef.bonusAuto, hero.level));
     }
     return true;
   }
-  aoeDamage(hero, sys, ds.def, hero.pos.x, hero.pos.z);
+  aoeDamage(hero, sys, dsDef, hero.pos.x, hero.pos.z);
   return true;
 }
 

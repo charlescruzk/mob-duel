@@ -808,6 +808,85 @@ async function main() {
     } catch (e) { return { error: String((e && e.stack) || e) }; }
   })()`);
 
+  await restart('hero=halvard&enemy=ilyra&lowfx=1');
+
+  await block('halvard: shield bash, stonewall reflect, charge knockback, earthbreaker zone, unyielding', `(async () => {
+    try {
+    ${SETUP}
+    const I = H.intent;
+    // Mid-lane; both regens zeroed so damage windows are exact.
+    H.teleport(0, 0); E.teleport(0, 1.5); fresh(H); fresh(E);
+    H.hpRegen = 0; E.hpRegen = 0; H.mpRegen = 0; E.mpRegen = 0;
+
+    // Q: targeted bash on the enemy nearest the reticle (2.5 m) — 50 raw × 0.92
+    // armour, 1 s stun, 40 mana, 8 s cooldown.
+    const ehpQ = E.hp;
+    I.aimX = 0; I.aimZ = 1.5;
+    edge(I, 'q'); step(0.3);
+    r.halvardQStuns = E.stunned === true && near(ehpQ - E.hp, 50 * 0.92, 1.5)
+      && near(H.mp, H.maxMp - 40, 1e-3) && near(H.cooldowns.q, 7.7, 0.15);
+    fresh(H);
+
+    // W: +0.20 armor on top of the 0.20 base (refreshArmor fires on apply).
+    edge(I, 'w');
+    r.halvardWArmorBuff = near(H.armor, 0.40, 1e-3) && H.abilities.reflectTimer > 0;
+
+    // W reflects 15% of PRE-mitigation damage: Ilyra's 48 auto costs Halvard
+    // 48 × (1 − 0.40) = 28.8 and costs Ilyra 48 × 0.15 × 0.92 = 6.62 as magic —
+    // in the same instant, inside the attacker's takeDamage.
+    fresh(H);
+    E.teleport(0, 3);
+    step(0.05);                    // settle prevIntent: fresh() leaves the W key's
+                                   // rising edge armed from the armor test above
+    edge(I, 'w');
+    const hhp0 = H.hp, ehpW = E.hp;
+    E.intent.attack = true; E.intent.aimX = 0; E.intent.aimZ = 0;
+    for (let k = 0; k < 200; k++) { const h0 = H.hp, e0 = E.hp; g.step(0.05); if (H.hp < h0 || E.hp < e0) break; }
+    E.intent.attack = false;
+    r.halvardWReflects = near(hhp0 - H.hp, 48 * 0.6, 1.5) && near(ehpW - E.hp, 48 * 0.15 * 0.92, 1);
+    fresh(H); E.intent.attack = false;
+
+    // E: dash at the reticle; the FIRST enemy hero within 1.2 m stops the dash,
+    // takes the damage and is knocked 2.5 m along the dash over 0.2 s + stunned
+    // 0.4 s. No landing aoe when a hero was hit. E at −4: hit at t ≈ 0.2, knock
+    // completes at t ≈ 0.4 → E lands at −6.5.
+    H.teleport(0, 0); E.teleport(0, -4);
+    const ehpE = E.hp;
+    I.aimX = 0; I.aimZ = -10;
+    edge(I, 'e'); step(0.45);
+    r.halvardEKnocksBack = near(E.pos.z, -6.5, 0.4) && E.stunned === true
+      && near(ehpE - E.hp, 40 * 0.92, 1.5) && H.abilities.dash.active === false;
+    fresh(H);
+
+    // R at level 4: 0.5 s wind-up, then r5 — 210 raw ×0.92, 1.2 s stun, and a
+    // 3 s zone that re-applies a 40% slow every frame it runs.
+    H.level = 4; fresh(H); fresh(E);
+    E.maxHp = 2000; E.hp = 1500;
+    H.teleport(0, 0); E.teleport(0, 2);
+    const ehpR = E.hp;
+    edge(I, 'r'); step(0.7);
+    r.halvardRStunsThenSlows = H.abilities.zone.active === true && E.stunned === true
+      && near(ehpR - E.hp, 210 * 0.92, 2) && E.slowPct === 0.4;
+    step(1.1);
+    r.halvardRZoneOutlastsStun = E.stunned === false && E.slowPct === 0.4
+      && H.abilities.zone.active === true;
+    step(2.5);                                   // 4.8 s after resolve: zone done
+    r.halvardRZoneExpires = H.abilities.zone.active === false;
+    step(0.6);                                   // last applied slow (0.5 s) decays
+    r.halvardRSlowClears = E.slowPct === 0;
+
+    // Unyielding: below 30% HP the armor getter reads +0.15 (0.35 total); back
+    // above the threshold it reverts — recomputed every frame from HP.
+    fresh(H); step(0.1);
+    const full = near(H.armor, 0.20, 1e-3);
+    H.hp = 200; step(0.1);
+    const low = near(H.armor, 0.35, 1e-3);
+    H.hp = H.maxHp; step(0.1);
+    r.halvardUnyieldingBelow30 = full && low && near(H.armor, 0.20, 1e-3);
+    return r;
+    } catch (e) { return { error: String((e && e.stack) || e) }; }
+  })()`);
+
   ws.close();
   try { server.kill('SIGKILL'); } catch { /* gone */ }
   try { chrome.kill('SIGKILL'); } catch { /* gone */ }
