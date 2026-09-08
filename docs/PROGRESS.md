@@ -129,6 +129,15 @@ gap a builder had to decide.
   look; the camera's smoothing and pitch limits; the shop panel's pointer-lock flow.
 - Balance dials, all in `heroData.js` / the unit constants: attack damage, cooldowns,
   tower `HERO_DAMAGE` and ramp, minion HP per wave, item stat lines.
+- **Phase 2 additions.** Frame rate with particles + shadows + the rigged characters on
+  screen at once (the probe runs SwiftShader headless — real GPU numbers unknown);
+  whether the cel-shaded look and outlines read well on all six rigs in motion; bot
+  personality for the four new heroes (vaskra/kesh/halvard/lumen assert behaviourally,
+  but whether their openings read as character is feel); whether Halvard's L6 rotation
+  (post Task 11 R bump) feels rewarding rather than spammy; whether Lumen's E→R combo,
+  now landing both casts, telegraphs clearly enough to dodge against.
+- Task 11's numbers come from a stationary dummy at mid-lane with full mana — real lane
+  pressure (minion aggro, tower dives, dodging, mana pressure) will move every TTK.
 
 ## Phase 2 — roster of six, build diversity, modern look
 
@@ -584,6 +593,103 @@ Minions are removed same-frame by waveSpawner on death, so no corpse anim for th
 - Not verifiable by the probe: how the rigs read in motion at real frame rate — walk
   cadence at each hero's move speed, swing readability per weapon, whether the death
   fall reads as a KO rather than a slow-motion tip-over (see Needs a human).
+
+### Task 11 — balance pass and write-up
+
+All six heroes were measured through the probe's driving pattern (`window.__game.step`
+with explicit dt, bot/controller off, minion waves held, both towers out of range — duel
+at mid-lane (0, ±1)) in a temp harness, deleted after the numbers landed.
+
+**Time-to-kill table.** "Full combo" = hold-intent: every button pressed for the first
+1.0 s (cooldowns are all ≥ 5 s, so each slot casts at most once per rotation). TTK in
+sim seconds. Combo-L6@50% = victim pre-set to 50 % HP at L6, killed within the 2 s
+rotation window?
+
+| Attacker | vs Brakk L1 (full HP) | vs Brakk L6 (full HP) | vs Brakk combo L6@50% | vs Ilyra L1 | vs Ilyra L6 | vs Ilyra combo L6@50% |
+|----------|------|------|-------|------|------|-------|
+| Brakk   | 9.38 | 6.38 | 1.38 ✓ | 6.38 | 4.38 | 0.54 ✓ |
+| Ilyra   | 9.38 | 5.24 | 0.52 ✓ | 5.78 | 2.54 | 0.42 ✓ |
+| Vaskra  | 6.80 | 4.70 | 1.26 ✓ | 4.22 | 2.00 | 1.26 ✓ |
+| Kesh    | 7.42 | 5.62 | 0.02 ✓ | 5.62 | 2.02 | 0.02 ✓ |
+| Halvard | 12.12 | 9.18 | 1.48 ✓ | 8.08 | 5.88 | 0.60 ✓ |
+| Lumen   | 12.44 | 7.06 | 2.00 ✓ | 9.08 | 3.22 | 1.30 ✓ |
+
+**Rule checks.**
+- *No hero kills a full-HP L1 hero with a full combo:* holds. One full rotation at L1
+  leaves survivors at 46–74 % HP (lowest: Kesh vs Ilyra, 46 % — Opportunist + Verdict
+  is the burst ceiling; Kesh's R is not even in the L1 rotation).
+- *Every hero kills a 50 %-HP L6 hero with a full combo:* holds after two fixes below.
+
+**What changed:**
+1. *Game bug, not a number* (`src/hero/abilities.js`): the AbilitySystem has a single
+   `field` slot, and Lumen's E (Undertow) and R (Deluge) are both `groundAoe` — casting
+   R during E's 0.4 s telegraph overwrote the pending field, eating the E (mana spent,
+   cooldown started, zero damage). The pending field now resolves where it stands when
+   replaced (`_landField()`, shared with the natural telegraph-expiry path). Any
+   groundAoe-into-groundAoe combo lands both casts.
+2. *Number* (`src/hero/heroData.js`): Halvard's R Earthbreaker `damage.step` 30 → 50
+   (base 120 untouched). With the complete rotation landing (Q 96 + E 72 + R + autos
+   after armour) he was still ~80 damage short of the 50 %-HP kill at L6 — the weakest
+   kit by design, so the pay-off ult takes the bump. L1 is unaffected (R locked there).
+   The Task 5 probe assertion was updated from 210 raw to 270 raw (120 + 50×3) — the
+   deliberate spec-driven number change, not an assertion relaxation.
+
+**Measurement assumptions:** the victim stands still with no intent (a real target may
+dodge — these are ceilings, not duel outcomes); both sides at full mana (no rotation was
+mana-gated); Kesh's 0.02 s kills are Verdict + Opportunist against a victim pre-placed
+at exactly the 30 % execute threshold — an artificial best case; intent edges mean a
+press held while the hero is busy (dash active) does not cast until the state clears,
+so the harness models holding the button rather than one-frame taps; lowfx pages (sim
+identical to the dressed page — probe-asserted).
+
+**Probe assertions (180, all true).** By block — scaffold: intent moves the hero, lane
+clamps, camera follows, events/world queries (intentPlain, facingMove, walkedForward,
+velTracked, laneClamped, heroStopsAtWall, cameraBehind, cameraDistance, timeAdvanced,
+rngDeterministic, mapBoxes, byTeam, enemiesInRadius, nearestEnemyNull,
+nearestEnemyFromRed, meshSynced, matchRunsAfterStart) — hero: movement, lane bound,
+recall, death and respawn (heroMoves, heroDies, deathEmitted, deathRespawnsAtNexus,
+revived, recallStarts, recallChannelsAndTeleports, movingCancelsRecall) — abilities:
+damage, ult lock, mana and cooldown gates, XP levels (abilityCastsAndDamages,
+ultLockedAtLevel1, ultUnlocksAtLevel4, cooldownGates, manaGates, xpLevelsUp,
+armorApplied, trueIgnoresArmor) — units: minions, last-hit gold, tower rules, nexus,
+match end, rematch (minionsWalk, minionsFight, minionWaveSpawnsAt15s, noMinionsBefore15,
+lastHitGoldToKiller, lastHitGoldOnlyToKiller, towerTargetsMinionsFirst,
+towerShootsHero, towerDamageRamps, towerKillPaysBounty, towerSwitchesToAggressiveHero,
+towerAggroSurvivesReset, nexusImmuneWhileTowerAlive, nexusExposedAfterTower,
+nexusDestroyedEndsMatch, matchResetWorks, reticleHitsGround) — economy/shop/bot
+(botFarmsLastHits, botReachesFarm, botRetreatsLowHp, botRetreatMovesHome, botSipsPotion,
+botBoughtPotions, buyIntentEdge, useItemEdge) — status (minionStunned, minionSlowed,
+minionRooted, heroRootedStillAttacks, rootedDashBlocked, statusClearsOnDeath) — items:
+attributes/consumables (itemStatsApply, attributeStr, attributeAgi, attributeInt,
+armorCap, attackSpeedCap, attackSpeedScalesInterval, consumableStacks,
+potionHealsOverTime, consumablesClearOnDeath, slotsFullRefused, uniqueRefused,
+fleetReplacesSwiftsoles, shopBuysInFountain, shopRefusesOutsideFountain,
+panelTabsAndItems) — items: passives (burnApplied, burnTicks, cleaveSideswipe,
+rendBonusDamage, flowRefundsMp, spellShieldBlocks, spellShieldRecharges, tempoThirdAuto,
+executeThreshold, executeBonus, undertowArmsOnCast, undertowSlowsNextAuto,
+secondWindTriggers, secondWindHeals, lifestealHeals) — vaskra (vaskraQPierces,
+vaskraWRaisesAttackSpeed, vaskraEHopsNoDamage, vaskraEBonusAuto, vaskraHeadhunterThirdHit,
+vaskraRExecScales, vaskraRInterruptedByStun) — kesh (keshQBlinksBehind, keshWStealthHidesFromBot,
+keshWEndsOnAttack, keshEConeHitsFrontOnly, keshOpportunistBonus, keshRDoublesBelow30,
+keshRRefundsOnKill) — halvard (halvardQStuns, halvardWArmorBuff, halvardWReflects,
+halvardEKnocksBack, halvardRStunsThenSlows, halvardRZoneOutlastsStun, halvardRZoneExpires,
+halvardRSlowClears, halvardUnyieldingBelow30) — lumen (lumenQRoots,
+lumenWHealsInstantAndOverTime, lumenEPullsToward, lumenRTicksAndSlows,
+lumenRHealsCasterInside, lumenRiptideHaste, abilityHitEventFires) — hero select and
+enemy param (selectShownWithNoMatch, sixCardsBuilt, cardsCarryAllSixKits,
+cardShowsFourAbilities, pickBuildsMatch, playerIsBrakk, selectHiddenAfterPick,
+startOverlayHiddenWhileSelecting, startOverlayRevealedAfterPick, enemyParamPicksHero,
+seededEnemyIsValid, defaultEnemyDiffersFromPlayer, defaultEnemyDeterministic,
+botRunsEnemyKit) — bot kits (botVaskraReachesFarm, botVaskraFarms, botVaskraShops,
+botKeshEntersTrade, botKeshDamagesPlayer, botKeshSurvivesTrade, botHalvardEntersTrade,
+botHalvardCcsWhenClose, botLumenHealsBelowHalf, botLumenHpRecovered, botSipsAfterCombat,
+botHoldsPotionInCombat) — fx (particlesEmitOnCast, particlesEmitOnHit, particlesDieOut,
+particleBuffersConstant, damageNumberShows, damageNumbersPoolConstant,
+damageNumbersPoolConstant2, digitUsesSlot0, fxResetsOnMatchReset) — look
+(shadowsEnabledByDefault, heroUsesToonMaterial, outlineMeshPresent, heroCastsShadow,
+renderStillRuns) — lowfx (lowfxDisablesComposer, lowfxStillSimulates) — rig
+(rigJointTable, walkCycleAdvancesWithDistance, idleDoesNotAdvanceWalk, attackSwingsArm,
+deathPoseFalls, respawnRestoresPose, rigNoAllocation).
 
 ## Known gaps, deliberately not in the slice
 

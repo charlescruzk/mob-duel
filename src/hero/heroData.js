@@ -270,7 +270,7 @@ export const HEROES = {
       r: {
         slot: 'r', name: 'Earthbreaker', cost: 100, cd: 65.0, range: 0, shape: 'windup',
         windup: 0.5, resolve: 'aoeStun', radius: 5.0,
-        damage: { base: 120, step: 30 }, stunTime: 1.2,
+        damage: { base: 120, step: 50 }, stunTime: 1.2,
         zone: { radius: 5.0, duration: 3.0, slowPct: 0.40, slowTime: 0.5, color: 0x4a7fd6 },
         desc: '0.5 s wind-up, then circle r5: damage and a 1.2 s knockup stun, leaving '
           + 'a 3 s field that slows enemies inside by 40%.',

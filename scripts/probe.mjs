@@ -869,15 +869,15 @@ async function main() {
       && near(ehpE - E.hp, 40 * 0.92, 1.5) && H.abilities.dash.active === false;
     fresh(H);
 
-    // R at level 4: 0.5 s wind-up, then r5 — 210 raw ×0.92, 1.2 s stun, and a
-    // 3 s zone that re-applies a 40% slow every frame it runs.
+    // R at level 4: 0.5 s wind-up, then r5 — 270 raw (120 + 50×3, the Task 11
+    // balance bump) ×0.92, 1.2 s stun, and a 3 s zone that re-applies a 40% slow.
     H.level = 4; fresh(H); fresh(E);
     E.maxHp = 2000; E.hp = 1500;
     H.teleport(0, 0); E.teleport(0, 2);
     const ehpR = E.hp;
     edge(I, 'r'); step(0.7);
     r.halvardRStunsThenSlows = H.abilities.zone.active === true && E.stunned === true
-      && near(ehpR - E.hp, 210 * 0.92, 2) && E.slowPct === 0.4;
+      && near(ehpR - E.hp, 270 * 0.92, 2) && E.slowPct === 0.4;
     step(1.1);
     r.halvardRZoneOutlastsStun = E.stunned === false && E.slowPct === 0.4
       && H.abilities.zone.active === true;

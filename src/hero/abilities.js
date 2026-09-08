@@ -138,6 +138,9 @@ export class AbilitySystem {
         this.startCooldown(slot);
         break;
       case 'groundAoe':
+        // One field slot: a second groundAoe mid-telegraph would overwrite the
+        // first (mana spent, no damage) — resolve the pending one where it stands.
+        if (this.field.active) this._landField();
         lib.startField(hero, this, def, aimX, aimZ);
         this.startCooldown(slot);
         break;
@@ -219,12 +222,7 @@ export class AbilitySystem {
     if (this.dash.active && lib.stepDash(hero, this, world, dt)) this.startCooldown('e');
     if (this.field.active) {
       this.field.timer -= dt;
-      if (this.field.timer <= EPS) {
-        this.field.active = false;
-        // Deluge is a groundAoe that leaves a zone instead of burst damage.
-        if (this.field.def.zone) ext.startZone(hero, this, this.field.def.zone, this.field.x, this.field.z);
-        else lib.landField(hero, this, this.field.def, this.field.x, this.field.z);
-      }
+      if (this.field.timer <= EPS) this._landField();
     }
     if (this.zone.active) ext.tickZone(hero, this, dt);
     if (this.hot.timer > 0) {
@@ -232,6 +230,16 @@ export class AbilitySystem {
       if (this.hot.timer <= 0) { this.hot.timer = 0; this.hot.rate = 0; }
       else hero.heal(this.hot.rate * dt);
     }
+  }
+
+  // Resolve the pending groundAoe: burst damage, or Deluge's zone. Runs on natural
+  // telegraph expiry and when a newer cast replaces the field, so both casts land.
+  _landField() {
+    const def = this.field.def;
+    this.field.active = false;
+    // Deluge is a groundAoe that leaves a zone instead of burst damage.
+    if (def.zone) ext.startZone(this.hero, this, def.zone, this.field.x, this.field.z);
+    else lib.landField(this.hero, this, def, this.field.x, this.field.z);
   }
 
   // Veil leaves stealth (expiry, attack or cast) — the resolver lives in ext.
