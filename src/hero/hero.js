@@ -7,13 +7,14 @@ import { distXZ } from '../core/physics.js';
 import { POSITIONS, RADII, enemyOf, isInFountain } from '../map/laneData.js';
 import {
   HEROES, SLOTS, atLevel, respawnTime, MAX_LEVEL, XP_TO_LEVEL, XP_SHARE_RADIUS,
-  RECALL_TIME, FOUNTAIN_REGEN_PCT, FOUNTAIN_LASER_DPS, CDR_CAP, HERO_KILL_GOLD,
+  FOUNTAIN_REGEN_PCT, FOUNTAIN_LASER_DPS, CDR_CAP, HERO_KILL_GOLD,
   ATTR, ARMOR_CAP, ATTACK_SPEED_CAP,
 } from './heroData.js';
 import { AbilitySystem } from './abilities.js';
 import { BasicAttack } from './heroAttack.js';
 import { applyItemTo, refreshItemStats, ITEM_KEYS } from './heroItems.js';
-import { buildHeroMesh } from './heroMesh.js';
+import { buildHeroMesh, applyStealthFade } from './heroMesh.js';
+import * as recall from './heroRecall.js';
 import { effects } from './effects.js';
 
 const START_GOLD = 400, EPS = 1e-6;
@@ -23,7 +24,6 @@ const levelPayload = { hero: null, level: 1 };
 const goldPayload = { hero: null, gold: 0 };
 const castPayload = { hero: null, slot: 'q', key: 'q' };
 const respawnPayload = { hero: null };
-const recallPayload = { hero: null, completed: false };
 const diedPayload = { hero: null, source: null };
 
 export class Hero extends Unit {
@@ -65,6 +65,8 @@ export class Hero extends Unit {
     const built = buildHeroMesh(heroKey, team);
     this.mesh = built.group;
     this.shieldMesh = built.shield;
+    this.meshMats = built.mats || [];      // faded to 0.35 while stealthed
+    this._stealthMeshOn = false;
     if (scene) scene.add(this.mesh);
     this.pos.copy(POSITIONS[team].heroSpawn);
     this.facing = team === 'blue' ? 0 : Math.PI;
@@ -78,6 +80,7 @@ export class Hero extends Unit {
   get xpValue() { return 120 + 30 * this.level; }
   get isCasting() { return this.abilities.isCasting; }
   get stunTimer() { return this.abilities.stunTimer; }
+  get stealthed() { return this.abilities.stealthed; }
   get slowTimer() { return this.abilities.slowTimer; }
   get slowPct() { return this.abilities.slowPct; }
   get stunned() { return this.abilities.stunned; }
@@ -141,6 +144,11 @@ export class Hero extends Unit {
       }
     }
     if (this.shieldMesh) this.shieldMesh.visible = this.shield > 0;
+    const stealthOn = this.abilities.stealthed;
+    if (stealthOn !== this._stealthMeshOn) {
+      this._stealthMeshOn = stealthOn;
+      applyStealthFade(this);
+    }
   }
 
   _regen(dt) {
@@ -168,20 +176,7 @@ export class Hero extends Unit {
     prev.recall = r;
   }
 
-  _recall(dt, intent) {
-    if (!this.isRecalling) return;
-    if (intent.moveX !== 0 || intent.moveZ !== 0 || intent.attack || this.stunned || this.isCasting) {
-      this.cancelRecall();
-      return;
-    }
-    this.recallTimer -= dt;
-    if (this.recallTimer > EPS) return;
-    this.isRecalling = false; this.recallTimer = 0;
-    const sp = POSITIONS[this.team].heroSpawn;
-    this.teleport(sp.x, sp.z);
-    recallPayload.hero = this; recallPayload.completed = true;
-    events.emit('recallEnded', recallPayload);
-  }
+  _recall(dt, intent) { recall.tickRecall(this, dt, intent); }
 
   _move(dt, intent) {
     if (this.stunned || this.abilities.rooted || this.isCasting || this.isRecalling) return;
@@ -195,21 +190,9 @@ export class Hero extends Unit {
 
   onAttackStart() { this.cancelRecall(); }
 
-  startRecall() {
-    if (!this.alive || this.isRecalling || this.stunned || this.isCasting) return false;
-    this.isRecalling = true;
-    this.recallTimer = RECALL_TIME;
-    recallPayload.hero = this; recallPayload.completed = false;
-    events.emit('recallStarted', recallPayload);
-    return true;
-  }
+  startRecall() { return recall.startRecall(this); }
 
-  cancelRecall() {
-    if (!this.isRecalling) return;
-    this.isRecalling = false; this.recallTimer = 0;
-    recallPayload.hero = this; recallPayload.completed = false;
-    events.emit('recallEnded', recallPayload);
-  }
+  cancelRecall() { recall.cancelRecall(this); }
 
   // kind: 'slow' | 'stun' | 'haste' | 'shield' | 'root' | 'stealth' |
   //       'attackSpeed' | 'armorBuff' | 'reflect' | 'bonusNextAuto' (PHASE2.md §3.5).
@@ -261,6 +244,12 @@ export class Hero extends Unit {
 
   _handleUnitDied(unit, source) {
     if (unit === this || unit.team === this.team) return;
+    // Verdict (Kesh R): a hero kill inside the strike window refunds half the cooldown.
+    const sys = this.abilities;
+    if (source === this && sys.strikeUnit === unit && unit.kind === 'hero' &&
+        this.world && this.world.time <= sys.strikeUntil) {
+      sys.cooldowns.r *= 0.5;
+    }
     if (unit.kind === 'hero' && source === this) this.kills++;
     if (!Hero.xpFromEvents) return;
     const xp = unit.xpValue || 0;

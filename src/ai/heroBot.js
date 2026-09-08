@@ -124,7 +124,9 @@ export class HeroBot {
     this.inEnemyTower = inTowerRange(pos, this.enemyTeam);
     if (player) this.view.read(world.time, this.p);
     const p = this.p;
-    this.playerDist = player && p.alive ? Math.sqrt(distSqXZ(pos, p)) : Infinity;
+    // A stealthed player drops out of the bot's senses entirely (Veil, PHASE2.md §3.2).
+    this.playerDist = player && p.alive && p.visible !== false
+      ? Math.sqrt(distSqXZ(pos, p)) : Infinity;
 
     world.byTeam(this.team, 'minion', this.allies);
     world.byTeam(this.enemyTeam, 'minion', this.enemies);

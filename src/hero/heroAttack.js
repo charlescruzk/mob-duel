@@ -49,6 +49,7 @@ export class BasicAttack {
     if (hero.stunned || hero.isCasting) return;
     const t = this.pickTarget(world, intent.aimX, intent.aimZ);
     if (!t) return;
+    if (hero.abilities.stealthed) hero.abilities.breakStealth();   // Veil ends on attack
     this.target = t;
     this.windup = hero.data.windup;
     // Attack speed: interval ÷ (1 + pct); item/agility stat capped in recomputeStats,
@@ -115,7 +116,7 @@ export class BasicAttack {
     if (sys.marksEnabled && sys.consumeMark(u)) dmg += atLevel(passive.bonus, hero.level);
     if (sys.bonusAutoTimer > 0) { dmg += sys.bonusAutoDmg; sys.bonusAutoTimer = 0; sys.bonusAutoDmg = 0; }
     dmg += passives.autoBonusDamage(hero, u);
-    const dealt = u.takeDamage(dmg, hero, 'physical');
+    const dealt = u.takeDamage(dmg * passives.opportunistMult(hero, u), hero, 'physical');
     if (hero.lifesteal > 0 && dealt > 0 && hero.alive) hero.heal(dealt * hero.lifesteal);
     passives.onAutoLand(hero, u);
     if (passive.kind === 'lifeOnHit' && hero.alive) {

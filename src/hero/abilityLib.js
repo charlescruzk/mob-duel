@@ -45,7 +45,7 @@ export function applyStatusTo(unit, kind, seconds, magnitude) {
 export function abilityHit(hero, sys, unit, raw, dtype) {
   if (!unit.alive || unit.invulnerable || unit.kind === 'tower' || unit.kind === 'nexus') return 0;
   if (passives.blockedBySpellShield(hero, unit)) return 0;
-  const dealt = unit.takeDamage(raw, hero, dtype || 'magic');
+  const dealt = unit.takeDamage(raw * passives.opportunistMult(hero, unit), hero, dtype || 'magic');
   passives.onAbilityHit(hero, unit, dealt);
   if (sys.marksEnabled && unit.alive) sys.markUnit(unit);
   return dealt;

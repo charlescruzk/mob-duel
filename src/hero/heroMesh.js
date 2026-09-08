@@ -1,18 +1,21 @@
 // Procedural hero meshes: a team-coloured capsule body plus a distinguishing head
 // shape per hero, a facing nose, and a hidden shield bubble the Hero toggles.
+// Materials that fade during Veil are returned in `mats` (opacity 1 → 0.35).
 // Visual offsets live on children; the group itself is placed by Unit.syncMesh().
 import * as THREE from 'three';
 import { RADII, HEIGHTS, TEAM_COLOR } from '../map/laneData.js';
 
 const BODY_R = RADII.hero * 0.84;
 
-const TRIM = { brakk: 0x6b6b6b, ilyra: 0xf2c84b, vaskra: 0x9fd6ff };
+const TRIM = { brakk: 0x6b6b6b, ilyra: 0xf2c84b, vaskra: 0x9fd6ff, kesh: 0xb06be0 };
 
 export function buildHeroMesh(heroKey, team) {
   const color = TEAM_COLOR[team];
   const g = new THREE.Group();
-  const bodyMat = new THREE.MeshLambertMaterial({ color });
-  const trimMat = new THREE.MeshLambertMaterial({ color: TRIM[heroKey] || 0xf2c84b });
+  const bodyMat = new THREE.MeshLambertMaterial({ color, transparent: true });
+  const trimMat = new THREE.MeshLambertMaterial({ color: TRIM[heroKey] || 0xf2c84b, transparent: true });
+  const noseMat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true });
+  const mats = [bodyMat, trimMat, noseMat];
 
   const bodyH = HEIGHTS.hero - 2 * BODY_R;
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(BODY_R, bodyH, 4, 12), bodyMat);
@@ -38,6 +41,14 @@ export function buildHeroMesh(heroKey, team) {
     bow.position.set(0.55, HEIGHTS.hero * 0.6, 0);
     bow.rotation.z = Math.PI / 2;
     g.add(bow);
+  } else if (heroKey === 'kesh') {
+    // Hollow: a pointed hood and a cowl collar.
+    const hood = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.6, 8), trimMat);
+    hood.position.y = HEIGHTS.hero + 0.12;
+    g.add(hood);
+    const cowl = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.28, 0.75), trimMat);
+    cowl.position.y = HEIGHTS.hero - 0.32;
+    g.add(cowl);
   } else {
     // Cinderweaver: a tall cone hat and a floating ember orb.
     const hat = new THREE.Mesh(new THREE.ConeGeometry(0.36, 0.7, 10), trimMat);
@@ -49,8 +60,7 @@ export function buildHeroMesh(heroKey, team) {
     g.add(orb);
   }
 
-  const nose = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.45),
-    new THREE.MeshLambertMaterial({ color: 0xffffff }));
+  const nose = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.45), noseMat);
   nose.position.set(0, HEIGHTS.hero * 0.7, -RADII.hero);
   g.add(nose);
 
@@ -60,5 +70,13 @@ export function buildHeroMesh(heroKey, team) {
   shield.visible = false;
   g.add(shield);
 
-  return { group: g, shield };
+  return { group: g, shield, mats };
+}
+
+// Stealth fade: the stealthed hero reads at 0.35 opacity (own view; enemy-side
+// view culling comes with the render pass work in Task 8/9).
+export function applyStealthFade(hero) {
+  const op = hero.abilities.stealthed ? 0.35 : 1;
+  const list = hero.meshMats;
+  for (let i = 0; i < list.length; i++) list[i].opacity = op;
 }

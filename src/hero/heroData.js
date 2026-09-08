@@ -176,9 +176,57 @@ export const HEROES = {
       },
     },
   },
+
+  kesh: {
+    key: 'kesh',
+    name: 'Kesh',
+    title: 'the Hollow',
+    role: 'melee assassin',
+    primary: 'agi',
+    ranged: false,
+    hp: { base: 540, step: 70 },
+    mp: { base: 240, step: 22 },
+    hpRegen: { base: 1.4, step: 0.15 },
+    mpRegen: { base: 1.0, step: 0.1 },
+    moveSpeed: 5.5,
+    attackRange: 1.8,
+    attackDamage: { base: 60, step: 6 },
+    attackInterval: 0.9,
+    windup: 0.2,
+    projectileSpeed: 0,
+    armor: { base: 0.10, step: 0.01 },
+    passive: {
+      key: 'p', name: 'Opportunist', kind: 'opportunist',
+      desc: 'Autos and abilities deal +20% damage to slowed, rooted or stunned targets.',
+    },
+    abilities: {
+      q: {
+        slot: 'q', name: 'Shadow Step', cost: 45, cd: 10.0, range: 7.0, shape: 'targetedBlink',
+        blinkBehind: 1.2, damage: { base: 55, step: 15 },
+        desc: 'Blink 1.2 m behind the enemy nearest the reticle (7 m) and strike it.',
+      },
+      w: {
+        slot: 'w', name: 'Veil', cost: 50, cd: 18.0, range: 0, shape: 'stealth',
+        duration: 3.0, stealthHaste: 0.25, veilBonus: { base: 40, step: 10 },
+        desc: 'Stealth 3 s, +25% move speed. Ends on attack or cast; the first basic '
+          + 'attack after deals 40 + 10/level bonus.',
+      },
+      e: {
+        slot: 'e', name: 'Fan of Blades', cost: 40, cd: 7.0, range: 4.5, shape: 'cone',
+        arc: 60, damage: { base: 60, step: 16 }, slowPct: 0.20, slowTime: 1.0,
+        desc: '60° cone, 4.5 m: damage and 20% slow 1 s.',
+      },
+      r: {
+        slot: 'r', name: 'Verdict', cost: 90, cd: 60.0, range: 5.0, shape: 'targeted',
+        execThreshold: 0.30, damage: { base: 120, step: 30 },
+        desc: 'Strike the enemy nearest the reticle (5 m), doubled below 30% HP. '
+          + 'A hero kill refunds half the cooldown.',
+      },
+    },
+  },
 };
 
-export const HERO_KEYS = ['brakk', 'ilyra', 'vaskra'];
+export const HERO_KEYS = ['brakk', 'ilyra', 'vaskra', 'kesh'];
 
 // Brakk ↔ Ilyra for the original pairing; every other hero bot-fills as Brakk until
 // hero select (Task 7) wires ?enemy=.

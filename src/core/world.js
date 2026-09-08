@@ -53,6 +53,8 @@ export class World {
 
   // Nearest alive, non-invulnerable enemy of `team` within maxDist of pos (centre
   // distance). kindFilter: 'hero' | 'minion' | 'tower' | 'nexus' | null. Unit or null.
+  // Stealthed heroes are skipped (Veil): towers/minions keep their current target —
+  // their sticky-lock logic — but can acquire no new one.
   nearestEnemy(pos, team, maxDist, kindFilter = null) {
     let best = null;
     let bestD2 = maxDist * maxDist;
@@ -61,6 +63,7 @@ export class World {
       const u = list[i];
       if (!u.alive || u.invulnerable || u.team === team) continue;
       if (kindFilter !== null && u.kind !== kindFilter) continue;
+      if (u.kind === 'hero' && u.stealthed) continue;
       const d2 = distSqXZ(pos, u.pos);
       if (d2 <= bestD2) { bestD2 = d2; best = u; }
     }

@@ -247,6 +247,56 @@ state; sim code never imports `fx/`.
 - Not verifiable by the probe: bow/cap readability on screen; whether the 1 s Deadeye
   aim telegraph reads; marksman kiting feel.
 
+### Task 4 — Kesh the Hollow
+
+- [x] Roster entry in `heroData.js` (`?hero=kesh`): agi melee assassin, 540+70 hp,
+      240+22 mp, 1.8 m range, 0.9 s attack, 60+6 AD, windup 0.2, armor 0.10+0.01.
+- [x] Passive **Opportunist** (`economy/passives.js opportunistMult`): autos and
+      abilities deal +20 % to slowed/rooted/stunned targets. Called from both damage
+      paths (`abilityHit` and `heroAttack.land`) — one helper, no cycle between
+      abilityLib and abilityLibExt.
+- [x] Q **Shadow Step** (`targetedBlink`, `abilityLibExt.castTargetedBlink`): nearest
+      enemy within 7 m *of the reticle point*; appear 1.2 m behind along its facing
+      (clamped to bounds/boxes/statics), face it, instant strike. Fizzles before mana
+      when nothing is in reach.
+- [x] W **Veil** (`stealth` shape): stealth status 3 s, +25 % move speed rides the
+      stealth timer via `stealthHaste` in `speedMult`. Ends on any other cast
+      (`tryCast`), on attack start (`heroAttack.update`), or expiry — all paths go
+      through `endStealth`, which arms the first-attack bonus (40 + 10/level, 3 s
+      window) through the existing `bonusNextAuto` path. Mesh fades to 0.35 opacity
+      (`heroMesh.applyStealthFade`, change-detected in `hero.update`).
+- [x] Stealth vs AI: `botSense.DelayedView.sample` marks `visible = hero.stealthed !==
+      true`; `heroBot._sense` reads `playerDist = Infinity` for an invisible player;
+      `world.nearestEnemy` skips stealthed heroes — so towers/minions keep a current
+      target via their sticky lock but can acquire no new one.
+- [x] E **Fan of Blades** (`cone`, `castCone`): 60°/4.5 m angle-and-distance test over
+      `world.units` (scratch direction vector, no allocation), 20 % slow 1 s.
+- [x] R **Verdict** (`targeted`, `castTargeted`): strike nearest enemy within 5 m of
+      the reticle, doubled below 30 % HP (read at cast). Cooldown starts *before* the
+      resolve, so the synchronous `unitDied` refund can halve it: a hero kill within
+      the 1 s strike window (`strikeUnit`/`strikeUntil`, tracked on abilities) halves
+      the remaining cooldown (`hero._handleUnitDied`).
+- [x] `?enemy=` wired minimally in `main.js` (`pickEnemy`) — Task 4's probe needs it;
+      the hero-select UI itself stays Task 7. Bot still just takes the enemy's kit.
+- [x] Mesh trim (`heroMesh.js`): pointed hood + cowl collar, trim 0xb06be0; body/
+      trim/nose materials now transparent so the stealth fade can drive them.
+- Assumptions (spec silent):
+  - Targeted shapes search *around the reticle point* (per prompt wording), not around
+    the caster; statics excluded; stealthed heroes excluded.
+  - Refund halves the *remaining* cooldown (×0.5), not a flat −30 s.
+  - Veil bonus window is 3 s from leaving stealth, whether the leave was expiry,
+    attack or cast — one rule.
+  - Stealth mesh fade applies to every viewer until Task 8/9 adds per-team view
+    culling; the bot-visibility rule is the authoritative "hidden" for AI.
+  - Opportunist reads the *target's* CC timers — a rooted minion hit by the cone
+    itself takes the +20 % (root is CC). Probe asserts this conflation deliberately.
+- Probe: new block `kesh: blink, veil, cone, opportunist, verdict` via
+  `restart('hero=kesh&enemy=ilyra&lowfx=1')` — 7 assertions, **113/113 total**
+  (was 106), exit 0, no code errors. One game fix found by the probe: Hero lacked a
+  `stealthed` read-through, so `botSense` never saw the stealth (added getter).
+- Not verifiable by the probe: hood/cowl readability; how readable 0.35 opacity is in
+  practice; whether blink-behind feels responsive at 1.2 m.
+
 ## Known gaps, deliberately not in the slice
 
 - Multiplayer. `docs/NETCODE.md` is the decision: server-authoritative at 20 Hz, intents

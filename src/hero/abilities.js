@@ -33,6 +33,8 @@ export class AbilitySystem {
     this.bonusAutoTimer = 0; this.bonusAutoDmg = 0;
     // Auto-applied slow window (Quickdraw W): while up, basic attacks slow the target.
     this.autoSlowTimer = 0; this.autoSlowPct = 0; this.autoSlowTime = 0;
+    this.stealthHaste = 0;                 // Veil's +25% move speed while stealthed
+    this.strikeUnit = null; this.strikeUntil = 0;   // Verdict refund tracking
     this._aim = { x: 0, z: 0 };            // wind-up aim scratch
     this.marksEnabled = data.passive.kind === 'mark';
     this.markDuration = this.marksEnabled ? data.passive.duration : 0;
@@ -47,7 +49,9 @@ export class AbilitySystem {
   get rooted() { return this.rootTimer > 0; }
   get stealthed() { return this.stealthTimer > 0; }
   get speedMult() {
-    return (1 - this.slowPct) * (1 + (this.hasteTimer > 0 ? this.hastePct : 0));
+    let m = (1 - this.slowPct) * (1 + (this.hasteTimer > 0 ? this.hastePct : 0));
+    if (this.stealthTimer > 0) m *= 1 + this.stealthHaste;
+    return m;
   }
   // attackSpeed magnitude is a fraction added; interval ÷ (1 + pct) in heroAttack.
   get attackSpeedPct() { return this.atkSpdTimer > 0 ? this.atkSpdPct : 0; }
@@ -73,7 +77,13 @@ export class AbilitySystem {
     if (this.state(slot) !== 'ready') return false;
     const hero = this.hero;
     const def = this.data.abilities[slot];
+    // Targeted shapes fizzle before mana is paid when nothing is in reach.
+    if (def.shape === 'targetedBlink' || def.shape === 'targeted') {
+      if (!ext.pickTargeted(hero, def, aimX, aimZ)) return false;
+    }
     if (def.shape === 'dash' && this.rooted) return false;   // rooted: no move, no dash
+    // Veil ends on any cast — except the Veil cast itself.
+    if (this.stealthed && def.shape !== 'stealth') this.breakStealth();
     hero.mp -= def.cost;
     switch (def.shape) {
       case 'selfAoe':
@@ -90,6 +100,23 @@ export class AbilitySystem {
       case 'buff':
         ext.castBuff(hero, this, def);
         this.startCooldown(slot);
+        break;
+      case 'stealth':
+        ext.castStealth(hero, this, def);
+        this.startCooldown(slot);
+        break;
+      case 'targetedBlink':
+        ext.castTargetedBlink(hero, this, def, aimX, aimZ);
+        this.startCooldown(slot);
+        break;
+      case 'cone':
+        ext.castCone(hero, this, def, aimX, aimZ);
+        this.startCooldown(slot);
+        break;
+      case 'targeted':
+        // Cooldown first: a kill inside the strike window halves it (Verdict refund).
+        this.startCooldown(slot);
+        ext.castTargeted(hero, this, def, aimX, aimZ);
         break;
       case 'windup':
         this.cast.slot = slot;
@@ -147,7 +174,10 @@ export class AbilitySystem {
       if (this.shieldTimer <= EPS || hero.shield <= 0) { this.shieldTimer = 0; hero.shield = 0; }
     }
     if (this.rootTimer > 0) { this.rootTimer -= dt; if (this.rootTimer <= EPS) this.rootTimer = 0; }
-    if (this.stealthTimer > 0) { this.stealthTimer -= dt; if (this.stealthTimer <= EPS) this.stealthTimer = 0; }
+    if (this.stealthTimer > 0) {
+      this.stealthTimer -= dt;
+      if (this.stealthTimer <= EPS) this._endStealth();
+    }
     if (this.atkSpdTimer > 0) { this.atkSpdTimer -= dt; if (this.atkSpdTimer <= EPS) this.atkSpdTimer = 0; }
     if (this.armorBuffTimer > 0) {
       this.armorBuffTimer -= dt;
@@ -185,6 +215,12 @@ export class AbilitySystem {
       }
     }
   }
+
+  // Veil leaves stealth (expiry, attack or cast) — the resolver lives in ext.
+  _endStealth() { ext.endStealth(this, this.hero); }
+
+  // Public break (attack start, cast): same path as natural expiry.
+  breakStealth() { if (this.stealthTimer > 0) this._endStealth(); }
 
   // kind: 'stun' | 'slow' | 'haste' | 'shield'. Slows do not stack: strongest wins,
   // an equal slow extends. Stun takes the longer remaining time.
@@ -263,6 +299,8 @@ export class AbilitySystem {
     this.shieldTimer = 0;
     this.rootTimer = 0;
     this.stealthTimer = 0;
+    this.stealthHaste = 0;
+    this.strikeUnit = null; this.strikeUntil = 0;
     this.atkSpdTimer = 0; this.atkSpdPct = 0;
     this.armorBuffTimer = 0; this.armorBuffVal = 0;
     this.reflectTimer = 0; this.reflectVal = 0;

@@ -693,6 +693,121 @@ async function main() {
     } catch (e) { return { error: String((e && e.stack) || e) }; }
   })()`);
 
+  await restart('hero=kesh&enemy=ilyra&lowfx=1');
+
+  await block('kesh: blink, veil, cone, opportunist, verdict', `(async () => {
+    try {
+    ${SETUP}
+    const I = H.intent;
+    const Minion = (await import('/src/units/minion.js')).Minion;
+    const spawn = (x, z) => {
+      const mn = W.add(new Minion('red', W, g.engine.scene, { x: x, y: 0, z: z }, { ranged: false, wave: 0 }));
+      mn.applyStatus('root', 30, 1);
+      return mn;
+    };
+    const fakeIntent = { moveX: 0, moveZ: 0, aimX: 0, aimZ: 0, attack: false,
+      q: false, w: false, e: false, r: false, recall: false, buy: -1 };
+    // Mid-lane, away from towers/fountain. E's regen is zeroed so damage windows are exact.
+    H.teleport(0, 0); E.teleport(0, 5); fresh(H); fresh(E); E.hpRegen = 0;
+
+    // Q: blink 1.2 m behind the target along its facing. E faces +z (facing = PI),
+    // so "behind" is −z: H lands at (0, 3.8), 1.2 m from E — past the 1.0 m radii sum,
+    // so separation never pushes. The strike is instant: 55 × (1 − 0.08 armor).
+    E.facing = Math.PI;
+    I.aimX = 0; I.aimZ = 5;
+    const ehp0 = E.hp;
+    edge(I, 'q'); step(0.3);
+    r.keshQBlinksBehind = near(H.pos.x, 0, 0.15) && near(H.pos.z, 3.8, 0.15)
+      && near(Math.abs(H.facing), Math.PI, 0.05) && near(ehp0 - E.hp, 55 * 0.92, 1.5);
+    fresh(H);
+
+    // W: while stealthed the bot's delayed view has no player (visible = false,
+    // playerDist = Infinity) and world acquisition skips the hero entirely.
+    const B = g.bot;
+    E.teleport(0, 12);
+    const mnV = spawn(2, 0);
+    edge(I, 'w'); step(0.1);
+    B.view.sample(W.time, H); B.view.read(W.time + 0.4, B.p);
+    B.update(0.2, fakeIntent);                     // full bot tick against a throwaway intent
+    r.keshWStealthHidesFromBot = H.abilities.stealthed === true && B.p.visible === false
+      && B.playerDist === Infinity
+      && W.nearestEnemy(mnV.pos, 'red', 12, 'hero') === null;
+    fresh(H);
+
+    // W ends on attack, and the first auto carries the veil bonus (40 at level 1):
+    // (60 + 40) × 0.92. Kesh is melee — the hit lands at wind-up end.
+    E.teleport(0, 5); H.teleport(0, 3.8);
+    edge(I, 'w'); step(0.1);
+    const ehpA = E.hp;
+    I.aimX = E.pos.x; I.aimZ = E.pos.z; I.attack = true;
+    step(0.5); I.attack = false;
+    r.keshWEndsOnAttack = H.abilities.stealthed === false && near(ehpA - E.hp, (60 + 40) * 0.92, 2);
+    fresh(H);
+
+    // E: 60° cone, 4.5 m, aimed down-lane. The front rooted minion takes 60 × 1.2
+    // (Opportunist: root is CC — the root itself arms the bonus); side and behind
+    // fail the angle test. Minion armour is 0.
+    H.teleport(0, 0);
+    const mnF = spawn(0, -3), mnS = spawn(3, 0), mnBk = spawn(0, 3);
+    I.aimX = 0; I.aimZ = -10;
+    edge(I, 'e'); step(0.3);
+    r.keshEConeHitsFrontOnly = near(mnF.maxHp - mnF.hp, 60 * 1.2, 1.5)
+      && mnS.hp === mnS.maxHp && mnBk.hp === mnBk.maxHp;
+    fresh(H);
+
+    // Opportunist: two autos on E, a 30% slow applied between them — the second
+    // deals exactly 1.2× the first (same armour, no other modifiers in play).
+    E.teleport(0, 1.2);
+    I.aimX = E.pos.x; I.aimZ = E.pos.z; I.attack = true;
+    let dealt1 = 0, dealt2 = 0, lands = 0;
+    for (let k = 0; k < 200 && lands < 2; k++) {
+      const before = E.hp;
+      g.step(0.05);
+      if (E.hp < before) {
+        lands++;
+        if (lands === 1) { dealt1 = before - E.hp; E.applyStatus('slow', 5, 0.3); }
+        else dealt2 = before - E.hp;
+      }
+    }
+    I.attack = false;
+    r.keshOpportunistBonus = lands === 2 && near(dealt2, dealt1 * 1.2, 1);
+    fresh(H);
+
+    // Verdict at level 4 (unlock level): 120 + 30×3 = 210 raw, ×0.92 armour.
+    // Full-HP target: single. Below the 30% threshold: doubled, and it survives
+    // (386.4 < 500) because maxHp is inflated to 2000. fresh(E) clears the test
+    // slow from the Opportunist check so it cannot inflate both strikes.
+    H.level = 4; fresh(H); fresh(E);
+    E.maxHp = 2000; E.hp = 2000;
+    E.maxHp = 2000; E.hp = 2000;
+    const ehpR1 = E.hp;
+    I.aimX = E.pos.x; I.aimZ = E.pos.z;
+    edge(I, 'r'); step(0.3);
+    const dealtR1 = ehpR1 - E.hp;
+    fresh(H); E.hp = 500;
+    const ehpR2 = E.hp;
+    edge(I, 'r'); step(0.3);
+    const dealtR2 = ehpR2 - E.hp;
+    r.keshRDoublesBelow30 = E.alive === true && near(dealtR1, 210 * 0.92, 2)
+      && near(dealtR2, 420 * 0.92, 2) && near(dealtR2, dealtR1 * 2, 2);
+
+    // Refund: a non-hero strike still sets the full 60 s cooldown; killing a HERO
+    // inside the strike window halves it (Verdict's unitDied refund).
+    fresh(H);
+    const mnE = spawn(0, -6);
+    I.aimX = 0; I.aimZ = -6;
+    edge(I, 'r'); step(0.3);
+    const cdAfterMinion = H.cooldowns.r;
+    fresh(H);
+    E.hp = 150;                                    // 386.4 damage kills: the refund path
+    I.aimX = E.pos.x; I.aimZ = E.pos.z;
+    edge(I, 'r'); step(0.2);
+    r.keshRRefundsOnKill = near(cdAfterMinion, 60, 0.5) && E.alive === false
+      && near(H.cooldowns.r, 30, 0.5);
+    return r;
+    } catch (e) { return { error: String((e && e.stack) || e) }; }
+  })()`);
+
   ws.close();
   try { server.kill('SIGKILL'); } catch { /* gone */ }
   try { chrome.kill('SIGKILL'); } catch { /* gone */ }

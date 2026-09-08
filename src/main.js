@@ -27,11 +27,16 @@ import { ShopPanel } from './hud/shopPanel.js';
 import { HeroBot } from './ai/heroBot.js';
 import { Match } from './game/match.js';
 
-// The player defaults to the melee bruiser; `?hero=ilyra` swaps kits. The bot always
-// takes whichever kit the player did not.
+// The player defaults to the melee bruiser; `?hero=`/`?enemy=` swap kits (the hero
+// select in Task 7 replaces these). The bot always takes the enemy's kit.
 function pickHero() {
   const q = new URLSearchParams(location.search).get('hero');
   return q && HEROES[q] ? q : 'brakk';
+}
+
+function pickEnemy(playerKey) {
+  const q = new URLSearchParams(location.search).get('enemy');
+  return q && HEROES[q] ? q : otherHero(playerKey);
 }
 
 function boot() {
@@ -56,7 +61,7 @@ function boot() {
   hero.intent = intent;
   world.add(hero);
   camera.snapTo(hero.pos);
-  const enemy = new Hero(otherHero(playerKey), 'red', world, scene);
+  const enemy = new Hero(pickEnemy(playerKey), 'red', world, scene);
   enemy.intent = makeIntent();
   world.add(enemy);
 

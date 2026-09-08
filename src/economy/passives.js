@@ -32,6 +32,19 @@ export function hasPassive(unit, key) {
   return list.indexOf(key) >= 0;
 }
 
+// Opportunist (Kesh hero passive): +20% autos and ability damage against slowed,
+// rooted or stunned targets. Hero CC timers live on abilities; minion timers on the
+// unit itself — same field names either way.
+export function opportunistMult(attacker, target) {
+  const p = attacker && attacker.data && attacker.data.passive;
+  if (!p || p.kind !== 'opportunist') return 1;
+  const a = target.abilities;
+  const cc = a
+    ? (a.stunTimer > 0 || a.rootTimer > 0 || a.slowTimer > 0)
+    : (target.stunTimer > 0 || target.rootTimer > 0 || target.slowTimer > 0);
+  return cc ? 1.2 : 1;
+}
+
 // Autos vs heroes below 40% HP: +15% of attack damage (added pre-mitigation).
 export function autoBonusDamage(hero, u) {
   if (!hasPassive(hero, 'execute')) return 0;

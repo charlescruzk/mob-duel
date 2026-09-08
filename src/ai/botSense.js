@@ -23,6 +23,20 @@ export const BOT_KIT = {
     e: { cost: 50, range: 4.5, radius: 0, base: 0, step: 0, level: 1 },
     r: { cost: 110, range: 16.0, radius: 0.8, base: 180, step: 45, level: 4 },
   },
+  vaskra: {
+    melee: false,
+    q: { cost: 40, range: 14.0, radius: 0.5, base: 65, step: 18, level: 1 },
+    w: { cost: 45, range: 0, radius: 0, base: 0, step: 0, level: 1 },
+    e: { cost: 35, range: 3.5, radius: 0, base: 0, step: 0, level: 1 },
+    r: { cost: 100, range: 30.0, radius: 0.6, base: 150, step: 40, level: 4 },
+  },
+  kesh: {
+    melee: true,
+    q: { cost: 45, range: 7.0, radius: 0, base: 55, step: 15, level: 1 },
+    w: { cost: 50, range: 0, radius: 0, base: 0, step: 0, level: 1 },
+    e: { cost: 40, range: 4.5, radius: 0, base: 60, step: 16, level: 1 },
+    r: { cost: 90, range: 5.0, radius: 0, base: 120, step: 30, level: 4 },
+  },
 };
 
 // Which kit a hero runs. Falls back on attack range when the hero exposes no key.
@@ -32,6 +46,8 @@ export function kitOf(hero) {
     const s = k.toLowerCase();
     if (s.indexOf('brakk') >= 0) return BOT_KIT.brakk;
     if (s.indexOf('ilyra') >= 0) return BOT_KIT.ilyra;
+    if (s.indexOf('vaskra') >= 0) return BOT_KIT.vaskra;
+    if (s.indexOf('kesh') >= 0) return BOT_KIT.kesh;
   }
   return (hero.attackRange || 2) <= 2.5 ? BOT_KIT.brakk : BOT_KIT.ilyra;
 }
@@ -82,6 +98,7 @@ export class DelayedView {
     if (this._count < RING) this._count++;
     const s = this._buf[this._head];
     s.t = now;
+    s.visible = hero.stealthed !== true;   // Veil: the bot does not see a stealthed hero
     s.x = hero.pos.x; s.z = hero.pos.z;
     s.vx = hero.vel.x; s.vz = hero.vel.z;
     s.hp = hero.hp; s.maxHp = hero.maxHp || 1;
@@ -107,6 +124,7 @@ export class DelayedView {
     out.x = pick.x; out.z = pick.z; out.vx = pick.vx; out.vz = pick.vz;
     out.hp = pick.hp; out.maxHp = pick.maxHp; out.hpPct = pick.hpPct; out.armor = pick.armor;
     out.alive = pick.alive; out.casting = pick.casting; out.recalling = pick.recalling;
+    out.visible = pick.visible !== false;
     out.level = pick.level;
     return true;
   }
@@ -114,7 +132,7 @@ export class DelayedView {
 
 export function makeSnapshot() {
   return { x: 0, z: 0, vx: 0, vz: 0, hp: 0, maxHp: 1, hpPct: 1, armor: 0,
-    alive: true, casting: false, recalling: false, level: 1 };
+    alive: true, casting: false, recalling: false, visible: true, level: 1 };
 }
 
 // Centre-to-centre distance to a team's tower vs. TOWER_RANGE (DESIGN.md §5).
