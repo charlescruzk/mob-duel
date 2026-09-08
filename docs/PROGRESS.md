@@ -697,3 +697,15 @@ deathPoseFalls, respawnRestoresPose, rigNoAllocation).
   in, snapshots out. The `HeroIntent` plain-data rule is honoured everywhere so the sim
   moves to a server unchanged — but no server exists.
 - A second lane, jungle, more heroes, a build step (see CLAUDE.md).
+
+### Post-phase-2 fixes (hand-verified in a real browser flow)
+
+- **Click-to-play did nothing after hero select.** `boot()` keeps a local `game` the
+  render loop checks every frame, but `startMatch()` built its own object and never
+  returned it, so the loop bailed out forever: pointer lock on, controller enabled,
+  countdown frozen at 3. The probe missed it because every block drives
+  `window.__game.step(dt)` directly. `startMatch` now returns the game and both call
+  sites assign it. New wall-clock check `renderLoopAdvancesMatch` (181 assertions).
+- **False "BOOT INCOMPLETE" on the hero-select screen.** The watchdog tested for
+  `window.__game`, which now only exists after a pick. Hero select sets the status to
+  "choose your hero" and the watchdog fires only while the status still reads "booting…".

@@ -91,16 +91,18 @@ function boot() {
   const enemyKey = paramHero('enemy');
 
   if (playerKey) {
-    startMatch(playerKey, enemyKey || seededEnemy(playerKey), {
+    game = startMatch(playerKey, enemyKey || seededEnemy(playerKey), {
       engine, input, world, scene, map, camera, controller, hud,
     });
   } else if (selectRoot) {
     selectRoot.classList.remove('hidden');
     if (overlay) overlay.classList.add('hidden');   // pick a hero first
+    const bs = document.getElementById('boot-status');
+    if (bs) bs.textContent = 'choose your hero · three r' + THREE.REVISION;
     new HeroSelect(selectRoot, (key) => {
       selectRoot.classList.add('hidden');
       if (overlay) overlay.classList.remove('hidden');
-      startMatch(key, enemyKey || seededEnemy(key), {
+      game = startMatch(key, enemyKey || seededEnemy(key), {
         engine, input, world, scene, map, camera, controller, hud,
       });
     });
@@ -203,6 +205,7 @@ function startMatch(playerKey, enemyKey, base) {
   window.__game = game;
   const bs = document.getElementById('boot-status');
   if (bs) bs.textContent = 'ready · three r' + THREE.REVISION + ' · ' + hero.heroKey + ' vs ' + enemy.heroKey;
+  return game;
 }
 
 boot();

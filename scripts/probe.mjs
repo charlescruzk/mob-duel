@@ -88,6 +88,17 @@ async function main() {
   await sleep(4500);
   await send('Runtime.evaluate', { expression: "const o=document.querySelector('#start-overlay'); if(o) o.click(); 'clicked'" });
   await sleep(1200);
+  // The render loop itself must have driven the match for that 1.2 s (the countdown
+  // starts at 3 and only Match.update lowers it). This is the one check that runs on
+  // the wall clock; everything below drives the clock by hand.
+  {
+    const r = await send('Runtime.evaluate', { expression: "window.__game ? window.__game.match.countdown : -1", returnByValue: true });
+    const cd = r?.result?.value;
+    const ok = typeof cd === 'number' && cd >= 0 && cd < 3;
+    console.log(`\n=== BEHAVIOR (render loop drives the match after click-to-play) ===`);
+    console.log({ renderLoopAdvancesMatch: ok, countdown: cd });
+    if (!ok) { exitCode = 1; console.log('  ✗ renderLoopAdvancesMatch'); }
+  }
   // From here on the render loop must not simulate: every block drives the clock itself.
   await send('Runtime.evaluate', { expression: "if (window.__game) window.__game.paused = true; 'paused'" });
 

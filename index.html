@@ -153,7 +153,9 @@
         show('UNHANDLED REJECTION: ' + (r && r.message ? r.message : r));
       });
       window.addEventListener('load', () => setTimeout(() => {
-        if (!window.__game) {
+        // Hero select sets its own status before a match exists; only a status still
+        // reading 'booting…' means main.js never got that far.
+        if (!window.__game && el && el.textContent.indexOf('booting') === 0) {
           show('BOOT INCOMPLETE — main.js did not finish.\n' +
                'If opened via file://, module scripts are blocked by the browser; serve it ' +
                'over http (npm run serve → http://127.0.0.1:8090). Otherwise the three.js ' +
