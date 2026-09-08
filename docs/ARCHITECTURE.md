@@ -36,6 +36,8 @@ src/
     heroData.js            the two heroes' numbers (DESIGN.md §3)                   HERO
     abilities.js           cooldown/mana/cast-state machine per slot                HERO
     abilityLib.js          the eight ability behaviours (Q/W/E/R × 2)               HERO
+    abilityLibExt.js       the new Phase 2 shapes (buff, targeted, cone, zone…)     HERO
+    statusExt.js           extra hero status kinds if abilities.js runs out of room HERO
     effects.js             projectiles, telegraphs, dash/blink motion, marks        HERO
   camera/
     thirdPerson.js         ThirdPersonCamera rig                                  (scaffold)
@@ -51,14 +53,28 @@ src/
     unitMeshes.js          primitive meshes for minion/tower/nexus                   UNITS
   economy/
     gold.js                GoldSystem: bounties + trickle from 'unitDied'      ECONOMY+BOT
-    items.js               the four items as data                              ECONOMY+BOT
+    items.js               the item table as data (Phase 2: 25 items)          ECONOMY+BOT
+    itemStats.js           item→stat aggregation if items.js runs out of room  ECONOMY+BOT
+    consumables.js         potion stacking/use (intent.useItem slots 1–6)      ECONOMY+BOT
+    passives.js            the nine item passives, called from the hit paths   ECONOMY+BOT
     shop.js                Shop: consumes intent.buy inside the fountain       ECONOMY+BOT
   ai/
     heroBot.js             HeroBot: writes the red hero's intent               ECONOMY+BOT
+  fx/                      VISUALS ONLY — imports core/, map/ and reads unit state;
+                           sim code never imports fx/. Mesh builders here keep the
+                           { group, shield } contract and never mutate sim state.
+    particles.js           one THREE.Points particle system, pooled buffers          FX
+    abilityFx.js           (heroKey, slot) → colour + emitter recipe table           FX
+    look.js                shadows, tone mapping, sky, fog, bloom composer           FX
+    rig.js                 procedural hero/minion rigs built from primitives         FX
+    rigAnimator.js         joint-angle pose blender driven by unit state             FX
   hud/
     hud.js                 Hud shell: bars, gold, level, timer, respawn, reticle (scaffold)
     abilityBar.js          fills #ability-bar from hero cooldowns                    HERO
     shopPanel.js           fills #shop; visible only in fountain              ECONOMY+BOT
+    shopPanelTabs.js       tab/inventory sub-view if shopPanel.js runs out of room   ECONOMY
+    heroSelect.js          #hero-select overlay: six cards, pick → start overlay    HUD
+    damageNumbers.js       32 pooled floating damage numbers, world→screen           FX
   game/
     match.js               Match: per-frame order, matchOver freeze, reset      INTEGRATOR
 scripts/
@@ -69,8 +85,10 @@ docs/
 ```
 
 Rule of thumb: `core/` and `map/` are imported by everyone; `hero/`, `units/`,
-`economy/`, `ai/` import only `core/`, `map/` and their own folder. Cross-system
-communication is events (§4). `hud/` reads state and listens; it never calls sim methods.
+`economy/`, `ai/` import only `core/`, `map/` and their own folder; `fx/` imports
+`core/`, `map/` and reads unit state, but sim code (`hero/`, `units/`, `economy/`,
+`ai/`, `game/`) never imports `fx/`. Cross-system communication is events (§4).
+`hud/` reads state and listens; it never calls sim methods.
 
 ---
 

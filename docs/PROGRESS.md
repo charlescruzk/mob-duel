@@ -1,6 +1,7 @@
 # PROGRESS.md — moba-duel
 
-**Status: the 1v1 duel-lane vertical slice is built and verified.**
+**Status: Phase 2 in progress — see `## Phase 2` below.**
+The 1v1 duel-lane vertical slice is built and verified.
 `npm run check` 38/38 · `npm run probe` exit 0, `(no code errors)`, **63/63 assertions true**.
 
 Play it: `npm run serve` → http://127.0.0.1:8090/index.html (`?hero=ilyra` to take the mage).
@@ -128,6 +129,19 @@ gap a builder had to decide.
   look; the camera's smoothing and pitch limits; the shop panel's pointer-lock flow.
 - Balance dials, all in `heroData.js` / the unit constants: attack damage, cooldowns,
   tower `HERO_DAMAGE` and ramp, minion HP per wave, item stat lines.
+
+## Phase 2 — roster of six, build diversity, modern look
+
+Spec: `docs/PHASE2.md`. Baseline before any Phase 2 work: `npm run check` 38/38 files,
+`npm run probe` exit 0, `(no code errors)`, **63/63 assertions true**.
+
+Planned file map additions (now in `docs/ARCHITECTURE.md`): `hero/abilityLibExt.js`,
+`hero/statusExt.js` (only if abilities.js needs the room), `economy/itemStats.js`
+(split-out if items.js overflows), `economy/consumables.js`, `economy/passives.js`,
+`hud/shopPanelTabs.js` (split-out if needed), `hud/heroSelect.js`, `hud/damageNumbers.js`,
+and a new `fx/` folder (`particles.js`, `abilityFx.js`, `look.js`, `rig.js`,
+`rigAnimator.js`) whose import rule is: fx imports `core/` and `map/` and reads unit
+state; sim code never imports `fx/`.
 
 ## Known gaps, deliberately not in the slice
 
