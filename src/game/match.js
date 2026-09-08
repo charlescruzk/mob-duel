@@ -19,6 +19,7 @@ export class Match {
     this.consumables = g.consumables; this.passives = g.passives;
     this.towers = g.towers; this.nexuses = g.nexuses;
     this.camera = g.camera; this.hud = g.hud; this.abilityBar = g.abilityBar; this.shopPanel = g.shopPanel;
+    this.fx = g.fx || null;
     this.state = 'countdown';
     this.countdown = COUNTDOWN;
     this.winner = null;
@@ -87,6 +88,7 @@ export class Match {
     this.hud.update(this.hero, this.world.time);
     this.abilityBar.update();
     this.shopPanel.update(dt);
+    if (this.fx) this.fx.update(dt);   // particles/trails/numbers use the fresh camera
   }
 
   _showBanner(text) {
@@ -140,6 +142,7 @@ export class Match {
     if (this.consumables) this.consumables.reset();
     if (this.passives) this.passives.reset(this.world);
     if (this.bot) this.bot.reset();
+    if (this.fx) this.fx.reset();
     this.abilityBar.invalidate();
     this.hud.invalidate();
     clearIntent(this.hero.intent);

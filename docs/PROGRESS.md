@@ -453,6 +453,47 @@ state; sim code never imports `fx/`.
   portraits as distinct silhouettes; whether the seeded matchup feels fair; bot
   potion timing under real pressure (the probe tests the guard, not the judgement).
 
+### Task 8 — particles, ability FX, damage numbers, hit feedback
+
+- [x] `src/fx/particles.js`: one `THREE.Points` over 3000 pre-allocated slots — flat
+      Float32Arrays for position/velocity/colour/size/alpha/life/gravity/drag, round-
+      robin emit (oldest overwritten), `ShaderMaterial` with additive blending, soft
+      circle falloff, size attenuation and alpha from remaining life. `update(dt)` sets
+      needsUpdate once per attribute per frame; ground clamps at y 0.06. Emitters:
+      `burst`, `ring`, `column`, and per-frame `trail` / `trailRgb`.
+- [x] `src/fx/abilityFx.js`: recipe table for all 24 abilities + autos per hero
+      (emitter kind, count, speed, life, size, per-kit hit colour); listens to
+      `abilityCast` (cast flourish + camera kick on R), `abilityHit` (impact burst),
+      `unitDamaged` (hit flash), `unitDied` (death burst in team colour),
+      `heroLevelUp` (gold ring), `recallStarted` (column), `heroRespawned` (burst),
+      `heroDied` (hard camera kick on own death). Projectile trails iterate the
+      effects pool each frame reading each mesh's live colour — no allocation.
+- [x] Hit flash: 0.1 s 8 % scale pop from a fixed 16-slot pool on the fx side. Scale,
+      not emissive — minion body materials are shared per team, so an emissive pulse
+      would light every minion on the team at once. Flashes die with the unit and
+      clear on fx.reset.
+- [x] `src/hud/damageNumbers.js`: 32 pooled divs built once, `unitDamaged` listener
+      fills the round-robin head; per-frame world→screen projection through one shared
+      `Vector3.project(camera)`, rise 1.3 m and fade over 0.8 s, colour by damage type,
+      19 px for hero hits vs 14 px. Behind-camera numbers hide rather than wrap.
+- [x] Camera kick: `thirdPerson.shake(amplitude, seconds)` — decaying random offset on
+      top of the settled frame; a louder shake replaces a quieter one rather than
+      stacking.
+- [x] Wiring: `main.js` builds the three systems once per page and exposes `g.fx`;
+      `Match._present` calls `fx.update(dt)` after the camera update (numbers project
+      through the fresh frame); `Match.reset` calls `fx.reset()`.
+- Assumptions (spec silent):
+  - Camera kick fires on R **cast** (wind-up) rather than impact — `abilityHit` does
+    not carry the slot, and a kick on wind-up reads the same to the player.
+  - `lowfx` does not disable particles (one 3000-slot pool is cheap; the composer and
+    shadows are the expensive parts, disabled in Task 9).
+  - Damage numbers show the mitigated amount actually removed (post-armor/shield).
+- Probe: new block `fx: particles emit on cast/hit and die out, buffers constant,
+  damage numbers pool, fx reset` — 8 assertions, **164/164 total** (was 156), exit 0,
+  no code errors, passed on the first run.
+- Not verifiable by the probe: whether the bursts read as juicy or as noise; flash and
+  kick amplitude at real frame rate; damage-number readability over a busy lane.
+
 ## Known gaps, deliberately not in the slice
 
 - Multiplayer. `docs/NETCODE.md` is the decision: server-authoritative at 20 Hz, intents

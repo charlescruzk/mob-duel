@@ -27,6 +27,9 @@ import { Shop } from './economy/shop.js';
 import { Consumables } from './economy/consumables.js';
 import { initPassives } from './economy/passives.js';
 import { ShopPanel } from './hud/shopPanel.js';
+import { DamageNumbers } from './hud/damageNumbers.js';
+import { ParticleSystem } from './fx/particles.js';
+import { AbilityFx } from './fx/abilityFx.js';
 import { HeroBot } from './ai/heroBot.js';
 import { Match } from './game/match.js';
 
@@ -140,9 +143,21 @@ function startMatch(playerKey, enemyKey, base) {
   const abilityBar = new AbilityBar(hero);
   const shopPanel = new ShopPanel(shop, input, hero);
 
+  // Visuals (fx/ never touches sim state): one particle pool, the event→recipe
+  // mapper, and the pooled damage numbers. Match.update drives fx.update; Match.reset
+  // clears it, and fx.reset is also what hero death leaves to the systems themselves.
+  const particles = new ParticleSystem(scene, 3000);
+  const abilityFx = new AbilityFx(particles, effects, camera, hero);
+  const damageNumbers = new DamageNumbers(engine.camera);
+  const fx = {
+    particles, abilityFx, damageNumbers,
+    update(dt) { abilityFx.update(dt); particles.update(dt); damageNumbers.update(dt); },
+    reset() { particles.reset(); abilityFx.reset(); damageNumbers.reset(); },
+  };
+
   const match = new Match({
     world, scene, input, hero, enemy, controller, bot, waves, shop, gold, effects,
-    towers, nexuses, camera, hud, abilityBar, shopPanel, consumables, passives,
+    towers, nexuses, camera, hud, abilityBar, shopPanel, consumables, passives, fx,
   });
 
   // Start gate and pointer lock. Opening the shop releases the lock on purpose, so
@@ -172,7 +187,7 @@ function startMatch(playerKey, enemyKey, base) {
   const game = {
     engine, input, events, world, camera, controller, intent, map, hud,
     hero, enemy, bot, towers, nexuses, waves, gold, shop, shopPanel, abilityBar,
-    consumables, passives,
+    consumables, passives, fx,
     effects, match, laneData: { POSITIONS, TEAMS, LANE_BOUNDS },
     three: THREE.REVISION,
     // Probe controls: `paused` stops the loop from simulating so step(dt) is the only

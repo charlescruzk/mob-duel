@@ -24,7 +24,20 @@ export class ThirdPersonCamera {
     this.forwardX = 0; this.forwardZ = -1;
     this.rightX = 1; this.rightZ = 0;
     this._snap = true;
+    this._shakeT = 0;                      // seconds of shake left
+    this._shakeAmp = 0;
+    this._shakeDur = 1;
     this._updateBasis();
+  }
+
+  // Camera kick (PHASE2.md §5 feel feedback): decaying random offset on R impacts
+  // and own death. Amplitude in metres, seconds the shake lasts.
+  shake(amplitude, seconds) {
+    if (amplitude > this._shakeAmp || this._shakeT <= 0) {
+      this._shakeAmp = amplitude;
+      this._shakeDur = seconds > 0 ? seconds : 0.01;
+    }
+    this._shakeT = seconds;
   }
 
   // Jump the pivot to the target on the next update (spawn, respawn, recall).
@@ -71,6 +84,16 @@ export class ThirdPersonCamera {
     cam.position.z = this.pivot.z - this.forwardZ * DISTANCE * cp;
     scratchDir.set(this.pivot.x, this.pivot.y + EYE_HEIGHT, this.pivot.z);
     cam.lookAt(scratchDir);
+    // Decay the kick on top of the settled frame position.
+    if (this._shakeT > 0) {
+      this._shakeT -= dt;
+      const decay = this._shakeT > 0 ? this._shakeT / this._shakeDur : 0;
+      const a = this._shakeAmp * decay;
+      cam.position.x += (Math.random() * 2 - 1) * a;
+      cam.position.y += (Math.random() * 2 - 1) * a * 0.6;
+      cam.position.z += (Math.random() * 2 - 1) * a;
+      if (this._shakeT <= 0) this._shakeAmp = 0;
+    }
   }
 
   // Ray from the camera through screen centre ∩ plane y=0. Writes `out`, returns

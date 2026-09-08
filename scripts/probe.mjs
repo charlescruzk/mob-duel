@@ -1144,6 +1144,44 @@ async function main() {
     } catch (e) { return { error: String((e && e.stack) || e) }; }
   })()`);
 
+  await block('fx: particles emit on cast/hit and die out, buffers constant, damage numbers pool, fx reset', `(async () => {
+    try {
+    ${SETUP}
+    const FX = g.fx; const P = FX.particles; const D = FX.damageNumbers;
+    const I = H.intent;
+    H.teleport(0, 0); E.teleport(0, 2); fresh(H); fresh(E);   // E inside Q's 3 m reach
+    step(0.2);                                    // settle: nothing alive yet
+    const alive0 = P.alive();
+    I.aimX = E.pos.x; I.aimZ = E.pos.z;
+    edge(I, 'q'); step(0.25);
+    r.particlesEmitOnCast = P.alive() > alive0;
+    r.particlesEmitOnHit = P.alive() > alive0 + 5;  // cast burst + impact burst
+    // A damage number appears for the hit (physical, hero-sized).
+    let shown = false, poolSize = 0;
+    for (let i = 0; i < D.slots.length; i++) {
+      if (D.slots[i].life > 0 && D.slots[i].el.textContent !== '') shown = true;
+    }
+    poolSize = D.root ? D.root.childElementCount : -1;
+    r.damageNumberShows = shown;
+    r.damageNumbersPoolConstant = poolSize === 32;
+    // Nothing keeps emitting (no bot, no minions) → everything dies out.
+    step(1.6);
+    r.particlesDieOut = P.alive() === 0;
+    // 200 frames: buffer lengths never change; the pool stays 32.
+    const lens = [P.pos.length, P.col.length, P.size.length, P.alpha.length, P.life.length];
+    for (let k = 0; k < 200; k++) g.step(0.05);
+    r.particleBuffersConstant = P.pos.length === lens[0] && P.col.length === lens[1]
+      && P.size.length === lens[2] && P.alpha.length === lens[3] && P.life.length === lens[4];
+    r.damageNumbersPoolConstant2 = D.root.childElementCount === 32;
+    // Match reset clears every particle.
+    edge(I, 'q'); step(0.1);
+    const aliveBefore = P.alive();
+    m.reset();
+    r.fxResetsOnMatchReset = aliveBefore > 0 && P.alive() === 0;
+    return r;
+    } catch (e) { return { error: String((e && e.stack) || e) }; }
+  })()`);
+
   ws.close();
   try { server.kill('SIGKILL'); } catch { /* gone */ }
   try { chrome.kill('SIGKILL'); } catch { /* gone */ }

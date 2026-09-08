@@ -81,7 +81,7 @@ src/
     shopPanel.js           fills #shop; visible only in fountain              ECONOMY+BOT
     shopPanelTabs.js       tab/inventory sub-view if shopPanel.js runs out of room   ECONOMY
     heroSelect.js          #hero-select overlay: six cards, pick → start overlay    HUD
-    damageNumbers.js       32 pooled floating damage numbers, world→screen           FX
+    damageNumbers.js       32 pooled floating damage numbers, world→screen           HUD
   game/
     match.js               Match: per-frame order, matchOver freeze, reset      INTEGRATOR
 scripts/
