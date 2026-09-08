@@ -68,6 +68,7 @@ export class Hero extends Unit {
     this.mesh = built.group;
     this.shieldMesh = built.shield;
     this.meshMats = built.mats || [];      // faded to 0.35 while stealthed
+    this.rig = built.rig || null;          // joint table the RigAnimator drives
     this._stealthMeshOn = false;
     if (scene) scene.add(this.mesh);
     this.pos.copy(POSITIONS[team].heroSpawn);

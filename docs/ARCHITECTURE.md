@@ -44,6 +44,7 @@ src/
     heroStats.js           recomputeStats + refreshArmor (Unyielding) from hero.js  HERO
     heroKnock.js           knockback displacement (Charge) — moves while stunned    HERO
     effects.js             projectiles, telegraphs, dash/blink motion, marks        HERO
+    heroMesh.js            thin adapter over fx/rig.buildHeroRig + stealth fade      HERO
   camera/
     thirdPerson.js         ThirdPersonCamera rig                                  (scaffold)
   map/
@@ -56,7 +57,7 @@ src/
     waveSpawner.js         WaveSpawner: t=15 s then every 30 s, 3+2 in formation     UNITS
     tower.js               class Tower extends Unit                                  UNITS
     nexus.js               class Nexus extends Unit                                  UNITS
-    unitMeshes.js          primitive meshes for minion/tower/nexus                   UNITS
+    unitMeshes.js          minion meshes via fx/rig.buildMinionRig; tower/nexus     UNITS
   economy/
     gold.js                GoldSystem: bounties + trickle from 'unitDied'      ECONOMY+BOT
     items.js               the item table as data (Phase 2: 25 items)          ECONOMY+BOT

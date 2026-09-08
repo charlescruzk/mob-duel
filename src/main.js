@@ -30,6 +30,7 @@ import { ShopPanel } from './hud/shopPanel.js';
 import { DamageNumbers } from './hud/damageNumbers.js';
 import { ParticleSystem } from './fx/particles.js';
 import { AbilityFx } from './fx/abilityFx.js';
+import { RigAnimator } from './fx/rigAnimator.js';
 import { HeroBot } from './ai/heroBot.js';
 import { Match } from './game/match.js';
 
@@ -150,9 +151,10 @@ function startMatch(playerKey, enemyKey, base) {
   const particles = new ParticleSystem(scene, 3000);
   const abilityFx = new AbilityFx(particles, effects, camera, hero);
   const damageNumbers = new DamageNumbers(engine.camera);
+  const rigAnimator = new RigAnimator(world);
   const fx = {
-    particles, abilityFx, damageNumbers,
-    update(dt) { abilityFx.update(dt); particles.update(dt); damageNumbers.update(dt); },
+    particles, abilityFx, damageNumbers, rigAnimator,
+    update(dt) { abilityFx.update(dt); rigAnimator.update(dt); particles.update(dt); damageNumbers.update(dt); },
     reset() { particles.reset(); abilityFx.reset(); damageNumbers.reset(); },
   };
 

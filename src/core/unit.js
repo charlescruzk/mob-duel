@@ -82,7 +82,9 @@ export class Unit {
     this.hp = 0;
     this.shield = 0;
     this.vel.set(0, 0, 0);
-    if (this.mesh) this.mesh.visible = false;
+    // Rigged units (heroes, minions) keep the mesh up for the death fall/sink — the
+    // animator hides it once sunk; unrigged structures hide instantly.
+    if (this.mesh) this.mesh.visible = !!this.rig;
     diedPayload.unit = this;
     diedPayload.source = source;
     events.emit('unitDied', diedPayload);

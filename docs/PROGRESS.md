@@ -542,9 +542,52 @@ state; sim code never imports `fx/`.
 - Not verifiable by the probe: whether the cel bands, outline weight, bloom threshold
   and ACES exposure actually read well at real frame rate (see Needs a human).
 
+### Task 10 — procedural rig animation
+
+Heroes and minions are no longer single capsules: `src/fx/rig.js` builds each hero as a
+nine-mesh joint tree (pelvis → torso → head/armL/armR → weapon, plus legL/legR) with a
+per-hero class weapon and head piece (brakk sword + helm, ilyra staff + ember orb + hat,
+vaskra bow + cap, kesh twin daggers + hood, halvard mace + tower shield + crest, lumen
+trident + crest + orb), and each minion as a three-part rig. Toon materials and outlines
+from Task 9 carry over; minion materials stay shared per team. All animation state lives
+on the returned `rig` object (`pose: Float32Array(joints×3)`, phase/dist timers), so the
+`{ group, shield, mats }` contract with heroMesh.js is unchanged — heroMesh.js is now a
+thin adapter and `unitMeshes.makeMinionMesh` delegates to the rig builder.
+
+`src/fx/rigAnimator.js` (in `fx`, constructed in main.js, ticked from Match's fx update)
+blends every rig toward a target pose at 12 rad/s from unit state only: distance-driven
+walk cycle (phase = metres/1.15-stride, opposite arm swing, amplitude by speed), idle
+breathing, stun/casting poses, hit recoil on `unitDamaged`, squash-stretch on dash
+landing, and a wind-up attack swing (weapon −2.2 → +0.8, right arm follows, blended
+faster at 30 rad/s — see bugs below). Death is scripted, not blended: pelvis tips back
+over 0.5 s (quadratic), arms out, root sinks 1.4 m after 1 s, mesh hides at 2.2 s.
+Minions are removed same-frame by waveSpawner on death, so no corpse anim for them.
+
+- `core/unit.js` die() now keeps rigged meshes visible (`visible = !!this.rig`) so the
+  fall/sink can play; the scaffold assertion was updated from `mesh.visible === false`
+  to `=== true` — deliberate spec-driven behaviour change (structures still hide
+  instantly). respawn()/revive() restore visibility as before.
+- Deviation from "sim never imports fx/": the mesh builders (hero/heroMesh.js,
+  units/unitMeshes.js) import fx/rig.js. They are visual-only code already importing
+  map/; the sim never imports fx/ still holds. engine.js → look.js was the Task 9
+  instance of the same rule (engine is the render layer).
+- Two game bugs found by the probe block and fixed: (1) the death fall was written into
+  the pose *before* the blend loop, which pulled it straight back toward zero — the
+  scripted value now overrides the blend; (2) the attack swing target sweeps through in
+  one wind-up, so at the 12 rad/s blend the pose never rose past −1.0 — the swing now
+  applies at its own 30 rad/s rate after the main blend.
+- Probe: new block `rig: walk phase tracks distance, idle holds, attack swings, death
+  falls, respawn restores, buffers constant` (7 assertions: joint table shape, walk
+  phase tracks distance, idle holds phase, swing peak < −1.2 rad, death pose < −1.2 with
+  mesh up, respawn restores pose/root, 200-frame buffer-length constancy).
+  **180/180 assertions true, exit 0, no code errors** (56/56 files pass `npm run check`).
+- Not verifiable by the probe: how the rigs read in motion at real frame rate — walk
+  cadence at each hero's move speed, swing readability per weapon, whether the death
+  fall reads as a KO rather than a slow-motion tip-over (see Needs a human).
+
 ## Known gaps, deliberately not in the slice
 
 - Multiplayer. `docs/NETCODE.md` is the decision: server-authoritative at 20 Hz, intents
   in, snapshots out. The `HeroIntent` plain-data rule is honoured everywhere so the sim
   moves to a server unchanged — but no server exists.
-- Minion CC, a second lane, jungle, more heroes, a build step (see CLAUDE.md).
+- A second lane, jungle, more heroes, a build step (see CLAUDE.md).

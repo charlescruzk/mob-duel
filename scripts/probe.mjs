@@ -177,7 +177,9 @@ async function main() {
     r.armorApplied = Math.abs(dealt - 75) < 1e-6 && Math.abs(hp0 - h.hp - 75) < 1e-6 && Math.abs(dmgSeen - 75) < 1e-6;
     r.trueIgnoresArmor = Math.abs(h.takeDamage(10, null, 'true') - 10) < 1e-6;
     h.takeDamage(1e9, null, 'true');
-    r.deathEmitted = diedSeen === 1 && h.alive === false && h.mesh.visible === false;
+    // Task 10: rigged units keep the mesh up for the death fall/sink (the animator
+    // hides it once sunk), so death is asserted on the unit state + event only.
+    r.deathEmitted = diedSeen === 1 && h.alive === false && h.mesh.visible === true;
     off1(); off2();
     h.revive(); h.pos.set(0, 0, 37); h.prevPos.copy(h.pos);
     r.revived = h.alive && h.hp === h.maxHp && h.mesh.visible;
@@ -1227,6 +1229,53 @@ async function main() {
     // The cheap path still renders (straight renderer.render) and simulates.
     for (let k = 0; k < 20; k++) g.step(0.05);
     r.lowfxStillSimulates = g.hero.alive && g.world.units.length > 0;
+    return r;
+    } catch (e) { return { error: String((e && e.stack) || e) }; }
+  })()`);
+
+  // Task 10: procedural rigs. Same page as the lowfx block; SETUP resets the match.
+  await block('rig: walk phase tracks distance, idle holds, attack swings, death falls, respawn restores, buffers constant', `(async () => {
+    try {
+    ${SETUP}
+    const R = H.rig;
+    const I = H.intent;
+    r.rigJointTable = !!R && R.kind === 'hero' && R.joints.length === 8 && R.pose.length === 24;
+    step(0.5);                                   // settle after reset
+    // Walk: run forward 1 s — phase advances with distance covered.
+    H.teleport(0, 20);
+    I.moveZ = -1;
+    const phase0 = R.phase;
+    for (let k = 0; k < 20; k++) g.step(0.05);
+    I.moveZ = 0;
+    r.walkCycleAdvancesWithDistance = R.dist > 3 && R.phase > phase0 + 3;
+    // Idle: standing still never advances the walk phase.
+    const phase1 = R.phase;
+    for (let k = 0; k < 30; k++) g.step(0.05);
+    r.idleDoesNotAdvanceWalk = R.phase === phase1;
+    // Attack swing: the weapon joint sweeps from raised (-2.2) to struck while the
+    // wind-up runs.
+    E.teleport(H.pos.x, H.pos.z - 1.2); fresh(H); fresh(E);
+    I.attack = true;
+    let swingPeak = 0;
+    for (let k = 0; k < 40; k++) {
+      g.step(0.02);
+      const wx = R.joints[7].rotation.x;
+      if (wx < swingPeak) swingPeak = wx;        // most raised angle seen
+    }
+    I.attack = false;
+    r.attackSwingsArm = swingPeak < -1.2;
+    // Death: the pelvis tips back over 0.5 s, mesh still up, then sink.
+    H.takeDamage(1e9, null, 'true');
+    for (let k = 0; k < 12; k++) g.step(0.05);
+    r.deathPoseFalls = R.pose[0] < -1.2 && H.mesh.visible === true;
+    // Respawn: pose blends back to idle, root height returns.
+    H.respawn();
+    for (let k = 0; k < 30; k++) g.step(0.05);
+    r.respawnRestoresPose = Math.abs(R.pose[0]) < 0.1 && Math.abs(R.root.position.y) < 0.1;
+    // 200 frames: the joint table and pose buffer never change length.
+    const jl = R.joints.length, pl = R.pose.length;
+    for (let k = 0; k < 200; k++) g.step(0.05);
+    r.rigNoAllocation = R.joints.length === jl && R.pose.length === pl;
     return r;
     } catch (e) { return { error: String((e && e.stack) || e) }; }
   })()`);

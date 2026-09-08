@@ -5,16 +5,13 @@
 import * as THREE from 'three';
 import { TEAM_COLOR, RADII, HEIGHTS } from '../map/laneData.js';
 import { toonMat, addOutline } from '../map/materials.js';
+import { buildMinionRig } from '../fx/rig.js';
 
 const SQRT2 = Math.SQRT2;
 
 // A 4-segment cylinder is a diamond in XZ; the 45° twist makes it an axis-aligned box.
 // Circumradius × √2 = half-width, so the tower footprint matches its collision radius.
 const geo = {
-  meleeBody: new THREE.BoxGeometry(0.5, 1.2, 0.5),
-  rangedBody: new THREE.BoxGeometry(0.45, 0.8, 0.45),
-  spike: new THREE.ConeGeometry(0.15, 0.5, 6),
-  nose: new THREE.BoxGeometry(0.14, 0.14, 0.2),
   towerPlinth: new THREE.BoxGeometry(RADII.tower * 2.2, 0.3, RADII.tower * 2.2),
   towerBody: new THREE.CylinderGeometry(0.7 * SQRT2, RADII.tower * SQRT2, HEIGHTS.tower, 4, 1),
   towerTop: new THREE.OctahedronGeometry(0.6, 0),
@@ -26,7 +23,6 @@ const geo = {
 const bodyMats = {};
 const glowMats = {};
 const shotMats = {};
-const noseMat = toonMat(0x1a1a1a);
 const plinthMat = toonMat(0x6b6b66);
 
 function bodyMat(team) {
@@ -50,23 +46,7 @@ export function shotMaterial(team) {
 }
 
 export function makeMinionMesh(team, ranged) {
-  const g = new THREE.Group();
-  const bodyH = ranged ? 0.8 : 1.2;
-  const body = new THREE.Mesh(ranged ? geo.rangedBody : geo.meleeBody, bodyMat(team));
-  body.position.y = bodyH / 2;
-  g.add(body);
-  if (ranged) {
-    const spike = new THREE.Mesh(geo.spike, glowMat(team));
-    spike.position.y = bodyH + 0.25;
-    g.add(spike);
-  }
-  // Dark nose on the -Z face so walking direction is readable at a glance.
-  const nose = new THREE.Mesh(geo.nose, noseMat);
-  nose.position.set(0, bodyH * 0.75, -(ranged ? 0.225 : 0.25) - 0.1);
-  g.add(nose);
-  addOutline(body, 1.04);
-  g.traverse((o) => { if (o.isMesh && o.name !== 'outline') o.castShadow = true; });
-  return g;
+  return buildMinionRig(ranged, team).group;   // three-part rig with the walk cycle
 }
 
 export function makeTowerMesh(team) {
