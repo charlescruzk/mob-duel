@@ -64,13 +64,20 @@ export class HeroBot {
 
   _onDamaged(e) {
     const player = this._player();
-    if (e.dtype !== 'magic' || !player) return;
+    if (!player) return;
+    // Any damage from the player marks combat (the potion guard keys on it); the
+    // mark on the player stays magic-only — that is what the mark items key on.
     if (e.unit === this.hero && e.source === player) this.hitByAbilityAt = this.world.time;
-    else if (e.unit === player && e.source === this.hero) this.markedUntil = this.world.time + 4.0;
+    else if (e.dtype === 'magic' && e.unit === player && e.source === this.hero) this.markedUntil = this.world.time + 4.0;
   }
 
   _onCast(e) {
-    if (e.slot === 'e' && e.hero === this._player()) this.playerEAt = this.world.time;
+    const player = this._player();
+    if (e.hero !== player) return;
+    // A player cast is incoming pressure: hold the potion guard from the moment the
+    // wind-up starts, not only when the damage actually lands.
+    this.hitByAbilityAt = this.world.time;
+    if (e.slot === 'e') this.playerEAt = this.world.time;
   }
 
   inOwnTowerRange(pos) { return inTowerRange(pos, this.team); }
@@ -95,6 +102,7 @@ export class HeroBot {
     for (let i = 0; i < FLAGS.length; i++) { this.prevFlags[FLAGS[i]] = intent[FLAGS[i]]; intent[FLAGS[i]] = false; }
     this.prevBuy = intent.buy;
     intent.buy = -1;
+    intent.useItem = -1;   // consumables consume on their own rising edge
     this._sense(player);
     const next = this._decide();
     if (next !== this.state) { this.state = next; this.stateAge = 0; }
@@ -202,7 +210,9 @@ export class HeroBot {
     // In the fountain: shop and heal up (recall arrival, respawn, or a retreat that got
     // this far). RETREAT is checked after — safePos lies outside the fountain.
     if (this.inFountain) {
-      const canShop = (hero.gold || 0) >= 250 && nextBuy(this) >= 0;
+      // nextBuy already filters by affordability, so a 50 g potion keeps the bot
+      // shopping after it can no longer afford its next tier item.
+      const canShop = nextBuy(this) >= 0;
       const low = this.hpPct < 0.45 || this.mpPct < 0.20;
       if (s === 'SHOP' ? (canShop || this.hpPct < 0.95 || this.mpPct < 0.80)
         : (s === 'RECALL' || canShop || low)) return 'SHOP';

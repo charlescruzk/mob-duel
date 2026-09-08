@@ -1,8 +1,9 @@
 // Per-state intent writers for HeroBot (DESIGN.md §9). Every function receives the
 // bot (`b`, already sensed this tick) and the intent to fill. No allocation: aim and
 // move helpers write straight into the intent; scratch lists live on the bot.
-import { ITEMS, INVENTORY_SLOTS, countItem } from '../economy/items.js';
+// Shopping and self-sustain live in botBuy.js.
 import { abilityReady, abilityDamage, lineBlocked, REACTION_DELAY } from './botSense.js';
+import { nextBuy, maybePotion, maybeHeal } from './botBuy.js';
 
 const AIM_MAX = 11.0;           // contract: reticle ≤ 12 m — leaves 1 m for drift between ticks
 const AIM_ERR_RAD = 7 * Math.PI / 180;
@@ -10,12 +11,6 @@ const AOE_ERR = 0.8;
 const LEAD = 0.25;
 const LAST_HIT = 0.9;
 const FLIGHT = 0.35;
-
-// Item indices into ITEMS (intent.buy order): swiftsoles 2, oxbelt 4, wardenplate 14,
-// whetstone 9, ironring 3 for the bruiser; sapphirebead 6, aether 11, stormglass 15,
-// voidlens 18 for the mage. Full build-priority work arrives with the bot rework.
-const PRIORITY = { brakk: [2, 4, 14, 9, 3], ilyra: [2, 6, 11, 15, 18] };
-const need = [0, 0, 0, 0];
 
 function ad(hero) { return hero.attackDamage || 62; }
 function range(hero) { return typeof hero.attackRange === 'number' ? hero.attackRange : 2.0; }
@@ -141,8 +136,9 @@ function attackPlayer(b, intent, lx, lz) {
   else { intent.moveX = 0; intent.moveZ = 0; }
 }
 
-// Wave-clear casts: Brakk Q on ≥2 minions inside 3 m that Q kills; Ilyra W on ≥3
-// inside a 2.5 m circle (groupMin overrides that count for PUSH).
+// Wave-clear casts: melee Q on ≥groupMin minions inside 3 m that Q kills; ranged
+// heroes pick the first ready damage/cc slot (w → e → q) and drop it on the densest
+// cluster — an AoE slot aims at the cluster centre, a narrow one shoots at it.
 function waveCast(b, intent, groupMin) {
   const kit = b.kit, hero = b.hero, list = b.enemies;
   if (kit.melee) {
@@ -156,51 +152,53 @@ function waveCast(b, intent, groupMin) {
     }
     return n >= groupMin && cast(b, intent, 'q');
   }
-  if (!abilityReady(kit, 'w', hero)) return false;
-  const dmg = abilityDamage(kit, 'w', hero);
-  for (let i = 0; i < list.length; i++) {
-    const c = list[i];
-    const cx = c.pos.x - hero.pos.x, cz = c.pos.z - hero.pos.z;
-    if (cx * cx + cz * cz > 64) continue;
-    let n = 0;
-    for (let j = 0; j < list.length; j++) {
-      const m = list[j];
-      const dx = m.pos.x - c.pos.x, dz = m.pos.z - c.pos.z;
-      if (dx * dx + dz * dz <= 6.25 && (groupMin < 3 || m.hp <= dmg)) n++;
-    }
-    if (n >= groupMin) {
-      aimAoe(b, intent, c.pos.x, c.pos.z);
-      return cast(b, intent, 'w');
+  const slots = ['w', 'e', 'q'];
+  for (let s = 0; s < slots.length; s++) {
+    const slot = slots[s], a = kit[slot];
+    if (a.base <= 0 || (a.kind !== 'damage' && a.kind !== 'cc')) continue;
+    if (!abilityReady(kit, slot, hero)) continue;
+    const dmg = abilityDamage(kit, slot, hero);
+    for (let i = 0; i < list.length; i++) {
+      const c = list[i];
+      const cx = c.pos.x - hero.pos.x, cz = c.pos.z - hero.pos.z;
+      if (cx * cx + cz * cz > 64) continue;
+      let n = 0;
+      for (let j = 0; j < list.length; j++) {
+        const m = list[j];
+        const dx = m.pos.x - c.pos.x, dz = m.pos.z - c.pos.z;
+        if (dx * dx + dz * dz <= 6.25 && (groupMin < 3 || m.hp <= dmg)) n++;
+      }
+      if (n >= groupMin) {
+        if (a.radius >= 2.0) aimAoe(b, intent, c.pos.x, c.pos.z);
+        else aimSkillshot(b, intent, c.pos.x, c.pos.z);
+        return cast(b, intent, slot);
+      }
     }
   }
   return false;
 }
 
-// Next priority-list item the bot can afford and does not yet own; -1 when none.
-export function nextBuy(b) {
-  const hero = b.hero;
-  if (!hero.items || hero.items.length >= INVENTORY_SLOTS) return -1;
-  const list = PRIORITY[b.kit.melee ? 'brakk' : 'ilyra'];
-  need[0] = 0; need[1] = 0; need[2] = 0; need[3] = 0;
-  for (let i = 0; i < list.length; i++) {
-    const idx = list[i];
-    need[idx]++;
-    if (countItem(hero, ITEMS[idx]) >= need[idx]) continue;
-    if ((hero.gold || 0) >= ITEMS[idx].cost) return idx;
-  }
-  return -1;
-}
+// Next priority-list item: delegated to botBuy.js (kept as a re-export so heroBot's
+// import surface is unchanged).
+export { nextBuy };
 
 // --- states ------------------------------------------------------------------
 
 export function actRetreat(b, intent) {
   moveTo(b, intent, b.safe.x, b.safe.z, 0.5);
   intent.attack = false;
+  let aimed = false;
   if (b.playerDist <= 4.0 && abilityReady(b.kit, 'e', b.hero)) {
-    aimAt(b, intent, b.safe.x, b.safe.z);
-    cast(b, intent, 'e');
+    aimAt(b, intent, b.safe.x, b.safe.z);      // escape toward home
+    aimed = cast(b, intent, 'e');
   }
-  if (b.kit.melee && b.hpPct < 0.5) cast(b, intent, 'w');
+  const wKind = b.kit.w.kind;
+  // Stealth and buffs fire while fleeing; the heal only below half. Skipped when the
+  // escape just aimed, so the reticle that matters isn't overwritten.
+  if (!aimed && (wKind === 'stealth' || wKind === 'buff' || (wKind === 'heal' && b.hpPct < 0.5))) {
+    cast(b, intent, 'w');
+  }
+  maybePotion(b, intent);
 }
 
 export function actRecall(b, intent) {
@@ -229,8 +227,10 @@ export function actFarm(b, intent) {
   const target = pickLastHit(b, 1.0);
   if (target) attackUnit(b, intent, target);
   else { intent.attack = false; moveTo(b, intent, b.farm.x, b.farm.z, 0.5); }
-  waveCast(b, intent, 3);
+  const cleared = waveCast(b, intent, 3);
   if (!b.kit.melee && b.playerDist <= 4.5) moveTo(b, intent, b.safe.x, b.safe.z, 0.5);
+  if (!cleared) maybeHeal(b, intent);   // keep the wave-clear reticle if one was aimed
+  maybePotion(b, intent);
 }
 
 export function actTrade(b, intent) {
@@ -251,13 +251,16 @@ export function actTrade(b, intent) {
     }
     return;
   }
-  // Ilyra: one aimed cast per tick, escape first.
+  // Ranged trade: one aimed cast per tick. Buff before engaging, escape first, then
+  // cc → ult → damage.
   const qCd = hero.cooldowns ? hero.cooldowns.q || 0 : 0;
   const wCd = hero.cooldowns ? hero.cooldowns.w || 0 : 0;
+  if (kit.w.kind === 'buff' && cast(b, intent, 'w')) return;   // Vaskra opens buffed
   if (b.markedUntil > now || qCd > 0) attackPlayer(b, intent, lx, lz);
   else { intent.attack = false; intent.moveX = 0; intent.moveZ = 0; }
   if (b.playerDist < 4.5) moveTo(b, intent, b.safe.x, b.safe.z, 0.5);
-  if (b.playerDist < 3.0 && now - b.playerEAt < 0.6 && abilityReady(kit, 'e', hero)) {
+  if (kit.e.kind === 'escape' && b.playerDist < 3.0 && now - b.playerEAt < 0.6 &&
+      abilityReady(kit, 'e', hero)) {
     aimAt(b, intent, b.safe.x, b.safe.z);
     if (cast(b, intent, 'e')) return;
   }
@@ -267,12 +270,20 @@ export function actTrade(b, intent) {
     aimSkillshot(b, intent, lx, lz);
     if (cast(b, intent, 'r')) return;
   }
-  if (abilityReady(kit, 'q', hero) && b.playerDist <= kit.q.range &&
+  // CC whenever the player is inside its range; damage only when in range and worth
+  // ≥ 10 % of the player's max HP (§6).
+  if (kit.e.kind === 'cc' && abilityReady(kit, 'e', hero) && b.playerDist <= kit.e.range) {
+    aimAoe(b, intent, lx, lz);
+    if (cast(b, intent, 'e')) return;
+  }
+  const qGate = kit.q.kind === 'damage' ? p.maxHp * 0.10 : 0;
+  if (qDmg >= qGate && abilityReady(kit, 'q', hero) && b.playerDist <= kit.q.range &&
       !lineBlocked(hero.pos.x, hero.pos.z, lx, lz, kit.q.range, kit.q.radius, b.enemies)) {
     aimSkillshot(b, intent, lx, lz);
     if (cast(b, intent, 'q')) return;
   }
-  if (abilityReady(kit, 'w', hero) && b.playerDist <= kit.w.range + 2) {
+  if (kit.w.kind === 'damage' && abilityReady(kit, 'w', hero) && b.playerDist <= kit.w.range + 2 &&
+      abilityDamage(kit, 'w', hero) >= p.maxHp * 0.10) {
     aimAoe(b, intent, lx, lz);
     if (cast(b, intent, 'w')) return;
   }

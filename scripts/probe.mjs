@@ -16,7 +16,10 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const PORT = 8090;
 const CDP = 9343;
-const URL = `http://127.0.0.1:${PORT}/index.html?cb=${Date.now()}`;
+const URL_BASE = `http://127.0.0.1:${PORT}/index.html`;
+// The first load runs a normal match (?hero=brakk); the hero-select block navigates
+// to the bare page, where the match is only built once a card is clicked.
+const URL = `${URL_BASE}?cb=${Date.now()}&hero=brakk&enemy=ilyra`;
 
 let exitCode = 0;
 
@@ -121,7 +124,11 @@ async function main() {
   // Fresh page for hero-specific blocks (the first load runs the default Brakk page):
   // navigate with new query params, click through the start gate, pause the clock.
   const restart = async (qs) => {
-    await send('Page.navigate', { url: `${URL}&${qs}` });
+    // Empty qs → the bare page: the hero-select overlay shows and no match is built.
+    // Always rebuilt from URL_BASE so params never duplicate the first load's (?cb
+    // refreshes each time — a stale cache key would replay an old page).
+    const url = `${URL_BASE}?cb=${Date.now()}${qs ? '&' + qs : ''}`;
+    await send('Page.navigate', { url });
     await sleep(4500);
     await send('Runtime.evaluate', { expression: "const o=document.querySelector('#start-overlay'); if(o) o.click(); 'clicked'" });
     await sleep(1200);
@@ -953,6 +960,186 @@ async function main() {
     r.lumenRTicksAndSlows = r.lumenRTicksAndSlows
       && near(ehpR - E.hp, 2 * 76 * 0.85, 3) && H.abilities.zone.active === true;
     r.lumenRHealsCasterInside = near(H.hp - 300, 0.03 * H.maxHp * 1.25, 2);
+    return r;
+    } catch (e) { return { error: String((e && e.stack) || e) }; }
+  })()`);
+
+  // Task 7: hero select, ?enemy=, bot for all six.
+
+  // Bare page: the select overlay shows, nothing is built until a card is clicked.
+  await restart('');
+  await block('hero select: six cards, click picks hero and builds the match', `(async () => {
+    try {
+    const r = {};
+    const sel = document.querySelector('#hero-select');
+    const overlay = document.querySelector('#start-overlay');
+    r.selectShownWithNoMatch = !!sel && !sel.classList.contains('hidden') && !window.__game;
+    r.startOverlayHiddenWhileSelecting = !!overlay && overlay.classList.contains('hidden');
+    const cards = sel ? sel.querySelectorAll('.hs-card') : [];
+    r.sixCardsBuilt = cards.length === 6;
+    r.cardsCarryAllSixKits = cards.length === 6 &&
+      ['brakk', 'ilyra', 'vaskra', 'kesh', 'halvard', 'lumen'].every((k) =>
+        Array.prototype.some.call(cards, (c) => c.dataset.hero === k));
+    r.cardShowsFourAbilities = cards.length > 0 &&
+      !!cards[0].querySelector('.hs-name') && !!cards[0].querySelector('.hs-abil') &&
+      cards[0].querySelectorAll('.hs-ab-row').length === 4;
+    const vaskra = Array.prototype.find.call(cards, (c) => c.dataset.hero === 'vaskra');
+    if (vaskra) vaskra.click();
+    const g = window.__game;
+    r.pickBuildsMatch = !!g && g.hero.heroKey === 'vaskra';
+    r.selectHiddenAfterPick = !!sel && sel.classList.contains('hidden');
+    r.startOverlayRevealedAfterPick = !!overlay && !overlay.classList.contains('hidden');
+    r.seededEnemyIsValid = !!g && g.enemy.heroKey !== 'vaskra' &&
+      ['brakk', 'ilyra', 'kesh', 'halvard', 'lumen'].indexOf(g.enemy.heroKey) >= 0;
+    if (overlay) overlay.click();                 // enter the match
+    g.paused = true;
+    r.matchRunsAfterStart = !!g.match && g.hero.heroKey === 'vaskra';
+    return r;
+    } catch (e) { return { error: String((e && e.stack) || e) }; }
+  })()`);
+
+  await restart('hero=brakk&enemy=vaskra&lowfx=1');
+  await block('enemy param picks the bot hero', `(async () => {
+    try {
+    const r = {};
+    const g = window.__game;
+    r.playerIsBrakk = !!g && g.hero.heroKey === 'brakk';
+    r.enemyParamPicksHero = !!g && g.enemy.heroKey === 'vaskra';
+    r.botRunsEnemyKit = !!g && !!g.bot.kit && g.bot.kit.id === 'vaskra';
+    return r;
+    } catch (e) { return { error: String((e && e.stack) || e) }; }
+  })()`);
+
+  // Seeded default enemy: the page's own FNV-1a pick among the other five —
+  // replicated here so "deterministic" is checked without a second navigation.
+  await restart('hero=kesh&lowfx=1');
+  await block('default enemy is a seeded pick among the other five', `(async () => {
+    try {
+    const r = {};
+    const g = window.__game;
+    let h = 0x811c9dc5;
+    const key = 'kesh';
+    for (let i = 0; i < key.length; i++) {
+      h ^= key.charCodeAt(i);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    const others = ['brakk', 'ilyra', 'vaskra', 'halvard', 'lumen'];
+    r.defaultEnemyDiffersFromPlayer = !!g && g.enemy.heroKey !== 'kesh' &&
+      others.indexOf(g.enemy.heroKey) >= 0;
+    r.defaultEnemyDeterministic = !!g && g.enemy.heroKey === others[h % others.length];
+    return r;
+    } catch (e) { return { error: String((e && e.stack) || e) }; }
+  })()`);
+
+  await restart('hero=brakk&enemy=vaskra&lowfx=1');
+  await block('bot vaskra: farms last hits and opens trades with its buff', `(async () => {
+    try {
+    ${SETUP}
+    m.bot = g.bot; g.bot.reset();
+    H.teleport(0, 37);                             // player parked at home
+    const seen = {}; let lastHits = 0; let buffed = false;
+    const offGold = g.events.on('gold', (p) => { if (p.hero === E && p.reason === 'lastHit') lastHits++; });
+    const offCast = g.events.on('abilityCast', (e) => { if (e.hero === E && e.slot === 'w') buffed = true; });
+    for (let t = 0; t < 60; t += 0.05) { g.step(0.05); seen[g.bot.state] = true; }
+    offGold(); offCast();
+    r.botVaskraReachesFarm = seen.FARM === true;
+    r.botVaskraFarms = lastHits >= 5;
+    r.botVaskraShops = seen.SHOP === true;
+    return r;
+    } catch (e) { return { error: String((e && e.stack) || e) }; }
+  })()`);
+
+  await restart('hero=brakk&enemy=kesh&lowfx=1');
+  await block('bot kesh: closes and trades when the player is in reach', `(async () => {
+    try {
+    ${SETUP}
+    m.bot = g.bot; g.bot.reset();
+    // Player parked mid-lane where the waves meet; the bot walks down with its wave
+    // and finds him inside Q reach. Topped up every 5 s so minions don't end the test.
+    H.teleport(0, 4); E.teleport(0, 6); fresh(H); fresh(E);
+    const seen = {}; let byBot = 0;
+    const off = g.events.on('unitDamaged', (e) => { if (e.unit === H && e.source === E) byBot++; });
+    for (let t = 0; t < 40; t += 0.05) {
+      g.step(0.05);
+      seen[g.bot.state] = true;
+      if (t % 5 < 0.025 && H.alive && H.hp < H.maxHp * 0.9) H.hp = H.maxHp;
+    }
+    off();
+    r.botKeshEntersTrade = seen.TRADE === true;
+    r.botKeshDamagesPlayer = byBot >= 3;
+    r.botKeshSurvivesTrade = E.hp > 0;
+    return r;
+    } catch (e) { return { error: String((e && e.stack) || e) }; }
+  })()`);
+
+  await restart('hero=brakk&enemy=halvard&lowfx=1');
+  await block('bot halvard: stuns the player when close', `(async () => {
+    try {
+    ${SETUP}
+    m.bot = g.bot; g.bot.reset();
+    // Same mid-lane parking as the kesh trade block; Halvard's Shield Bash (1 s stun)
+    // fires whenever the player is inside its 2.5 m reach during a trade.
+    H.teleport(0, 4); E.teleport(0, 6); fresh(H); fresh(E);
+    const seen = {}; let stuns = 0;
+    const off = g.events.on('unitDamaged', (e) => { if (e.unit === H && e.dtype !== 'physical') stuns++; });
+    for (let t = 0; t < 40; t += 0.05) {
+      g.step(0.05);
+      seen[g.bot.state] = true;
+      if (H.stunned) stuns++;
+      if (t % 5 < 0.025 && H.alive && H.hp < H.maxHp * 0.9) H.hp = H.maxHp;
+    }
+    off();
+    r.botHalvardEntersTrade = seen.TRADE === true;
+    r.botHalvardCcsWhenClose = stuns > 0;
+    return r;
+    } catch (e) { return { error: String((e && e.stack) || e) }; }
+  })()`);
+
+  await restart('hero=brakk&enemy=lumen&lowfx=1');
+  await block('bot lumen: heals below half HP, sustains through the lane', `(async () => {
+    try {
+    ${SETUP}
+    m.bot = g.bot; g.bot.reset();
+    H.teleport(0, 37);                             // player far: no combat pressure
+    E.teleport(0, 10);
+    E.hp = E.maxHp * 0.40;
+    const startHp = E.hp;
+    let heals = 0; let peak = startHp;
+    const off = g.events.on('abilityCast', (e) => { if (e.hero === E && e.slot === 'w') heals++; });
+    for (let t = 0; t < 10; t += 0.05) { g.step(0.05); if (E.hp > peak) peak = E.hp; }
+    off();
+    r.botLumenHealsBelowHalf = heals >= 1;
+    r.botLumenHpRecovered = peak >= startHp + 60;
+    return r;
+    } catch (e) { return { error: String((e && e.stack) || e) }; }
+  })()`);
+
+  await restart('hero=brakk&enemy=brakk&lowfx=1');
+  await block('bot: buys two potions at start, sips below 60% out of combat, not in combat', `(async () => {
+    try {
+    ${SETUP}
+    m.bot = g.bot; g.bot.reset();
+    step(2.0);                                     // settle: the bot SHOPs in the fountain
+    r.botBoughtPotions = E.items.some((it) => it.key === 'hpotion');
+    // Out of combat, below 60 %: the bot sips.
+    H.teleport(0, 37);
+    E.teleport(0, 10);
+    E.hp = E.maxHp * 0.45;
+    step(1.0);
+    r.botSipsPotion = E.potionHpTimer > 0 && E.potionHpRate > 0;
+    // In combat (the player just cast): no sip while the 2 s guard runs. The running
+    // HoT stays live through the cast frame on purpose — it blocks a same-frame race
+    // sip — and is cancelled only after the cast has armed the guard.
+    H.teleport(0, 12); E.teleport(0, 9);
+    fresh(H);
+    H.intent.aimX = E.pos.x; H.intent.aimZ = E.pos.z;
+    edge(H.intent, 'q');
+    E.potionHpTimer = 0; E.potionHpRate = 0;
+    E.hp = E.maxHp * 0.45;
+    step(0.4);
+    r.botHoldsPotionInCombat = E.potionHpTimer === 0 && E.potionHpRate === 0;
+    step(2.2);                                     // guard (2 s) expires → it sips
+    r.botSipsAfterCombat = E.potionHpTimer > 0 || E.hp > E.maxHp * 0.45 + 30;
     return r;
     } catch (e) { return { error: String((e && e.stack) || e) }; }
   })()`);

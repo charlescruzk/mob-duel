@@ -1,6 +1,8 @@
 // main.js — builds every long-lived object, hands them to Match, and runs the loop.
 // Nothing here simulates: Match owns the per-frame order (docs/ARCHITECTURE.md §2).
 // Sets window.__game once; the probe drives the game through __game.step(dt).
+// Without `?hero=` the hero-select overlay picks the player hero first; the match is
+// only constructed once a hero is chosen.
 import * as THREE from 'three';
 import { Engine } from './core/engine.js';
 import { events } from './core/events.js';
@@ -13,9 +15,10 @@ import { buildLane } from './map/laneBuilder.js';
 import { LANE_BOUNDS, POSITIONS, TEAMS } from './map/laneData.js';
 import { Hud } from './hud/hud.js';
 import { Hero } from './hero/hero.js';
-import { HEROES, otherHero } from './hero/heroData.js';
+import { HEROES, HERO_KEYS } from './hero/heroData.js';
 import { effects } from './hero/effects.js';
 import { AbilityBar } from './hud/abilityBar.js';
+import { HeroSelect } from './hud/heroSelect.js';
 import { Tower } from './units/tower.js';
 import { Nexus } from './units/nexus.js';
 import { WaveSpawner } from './units/waveSpawner.js';
@@ -27,16 +30,25 @@ import { ShopPanel } from './hud/shopPanel.js';
 import { HeroBot } from './ai/heroBot.js';
 import { Match } from './game/match.js';
 
-// The player defaults to the melee bruiser; `?hero=`/`?enemy=` swap kits (the hero
-// select in Task 7 replaces these). The bot always takes the enemy's kit.
-function pickHero() {
-  const q = new URLSearchParams(location.search).get('hero');
-  return q && HEROES[q] ? q : 'brakk';
+// `?hero=` / `?enemy=`: a validated key, or null when absent/unknown.
+function paramHero(name) {
+  const q = new URLSearchParams(location.search).get(name);
+  return q && HEROES[q] ? q : null;
 }
 
-function pickEnemy(playerKey) {
-  const q = new URLSearchParams(location.search).get('enemy');
-  return q && HEROES[q] ? q : otherHero(playerKey);
+// Default enemy: a deterministic seeded pick among the other five (FNV-1a on the
+// player key) so the same player hero always meets the same opponent.
+function seededEnemy(playerKey) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < playerKey.length; i++) {
+    h ^= playerKey.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  const others = [];
+  for (let i = 0; i < HERO_KEYS.length; i++) {
+    if (HERO_KEYS[i] !== playerKey) others.push(HERO_KEYS[i]);
+  }
+  return others[h % others.length];
 }
 
 function boot() {
@@ -51,17 +63,59 @@ function boot() {
 
   const camera = new ThirdPersonCamera(engine.camera, input);
   const controller = new HeroController(input, camera);
+  controller.enabled = false;
   const hud = new Hud();
+
+  engine.onError = (err) => {
+    const el = document.getElementById('boot-status');
+    if (el) { el.textContent = 'FRAME ERROR: ' + (err && err.message ? err.message : err); el.style.color = '#ff6b6b'; }
+    console.error(err);
+  };
+
+  // The loop is inert until a match exists (hero-select path). The game simulates
+  // only while the pointer is locked; unlocked, Match keeps camera/HUD/shop alive.
+  let game = null;
+  engine.start((dt) => {
+    if (!game || game.paused) return;
+    if (input.locked || game.forceRun) game.match.update(dt);
+    else game.match.idle(dt);
+  });
+
+  const selectRoot = document.getElementById('hero-select');
+  const overlay = document.getElementById('start-overlay');
+  const playerKey = paramHero('hero');
+  const enemyKey = paramHero('enemy');
+
+  if (playerKey) {
+    startMatch(playerKey, enemyKey || seededEnemy(playerKey), {
+      engine, input, world, scene, map, camera, controller, hud,
+    });
+  } else if (selectRoot) {
+    selectRoot.classList.remove('hidden');
+    if (overlay) overlay.classList.add('hidden');   // pick a hero first
+    new HeroSelect(selectRoot, (key) => {
+      selectRoot.classList.add('hidden');
+      if (overlay) overlay.classList.remove('hidden');
+      startMatch(key, enemyKey || seededEnemy(key), {
+        engine, input, world, scene, map, camera, controller, hud,
+      });
+    });
+  }
+}
+
+// Builds both heroes and everything that hangs off them, wires the start gate, and
+// publishes window.__game. Runs once per page load — a pick or `?hero=` triggers it.
+function startMatch(playerKey, enemyKey, base) {
+  const { engine, input, world, scene, map, camera, controller, hud } = base;
 
   // Heroes. Each is driven by a plain-data intent — the controller writes the
   // player's, the bot writes the enemy's, and Hero never knows which (NETCODE.md).
-  const playerKey = pickHero();
   const intent = makeIntent();
   const hero = new Hero(playerKey, 'blue', world, scene);
   hero.intent = intent;
   world.add(hero);
   camera.snapTo(hero.pos);
-  const enemy = new Hero(pickEnemy(playerKey), 'red', world, scene);
+  const enemy = new Hero(enemyKey, 'red', world, scene);
   enemy.intent = makeIntent();
   world.add(enemy);
 
@@ -114,13 +168,6 @@ function boot() {
     }
     hud.showReticle(locked || !started);
   };
-  controller.enabled = false;
-
-  engine.onError = (err) => {
-    const el = document.getElementById('boot-status');
-    if (el) { el.textContent = 'FRAME ERROR: ' + (err && err.message ? err.message : err); el.style.color = '#ff6b6b'; }
-    console.error(err);
-  };
 
   const game = {
     engine, input, events, world, camera, controller, intent, map, hud,
@@ -135,17 +182,9 @@ function boot() {
     step: (dt) => match.update(dt),
   };
 
-  // The game simulates only while the pointer is locked (the overlay is the pause
-  // screen); unlocked, Match keeps the camera, HUD and shop panel responsive.
-  engine.start((dt) => {
-    if (game.paused) return;
-    if (input.locked || game.forceRun) match.update(dt);
-    else match.idle(dt);
-  });
-
   window.__game = game;
   const bs = document.getElementById('boot-status');
-  if (bs) bs.textContent = 'ready · three r' + THREE.REVISION + ' · ' + playerKey + ' vs ' + enemy.heroKey;
+  if (bs) bs.textContent = 'ready · three r' + THREE.REVISION + ' · ' + hero.heroKey + ' vs ' + enemy.heroKey;
 }
 
 boot();

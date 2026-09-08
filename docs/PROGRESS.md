@@ -400,6 +400,59 @@ state; sim code never imports `fx/`.
   the 2 m snap-pull feels like a drag or a teleport; Deluge's 3 %/s self-heal balance
   while tanking inside the tide.
 
+### Task 7 — hero select, `?enemy=`, bot for all six
+
+- [x] Hero-select overlay (`src/hud/heroSelect.js`, 140 lines): six cards built once in
+      the constructor from HERO_KEYS — procedural 96×96 canvas portrait silhouettes,
+      name + title, primary attribute + role badge, the four ability rows and the
+      passive. Click → `onPick(key)`; the overlay hides and the start gate shows.
+      Every DOM read is guarded; a missing `#hero-select` degrades to the old
+      `?hero=` flow.
+- [x] `main.js` restructured into `boot()` + `startMatch()`: without `?hero=` the
+      select overlay shows and the match is only constructed once a card is clicked;
+      with `?hero=` the match builds immediately. `?enemy=` picks the bot hero;
+      anything missing/unknown falls back to the seeded default.
+- [x] Seeded default enemy: deterministic FNV-1a over the player key, index into the
+      other five in HERO_KEYS order — brakk→lumen, ilyra→brakk, vaskra→brakk,
+      kesh→halvard, halvard→lumen, lumen→brakk.
+- [x] BOT_KIT rewritten to the §6 generic schema: every kit carries `id`, every slot
+      `{ cost, range, radius, base, step, minLevel, kind }` with kind ∈ damage | cc |
+      buff | escape | heal | stealth. `abilityReady` now gates on `minLevel` (it
+      previously read a field that no longer existed — latent bug the probe surfaced).
+- [x] `botBuy.js` split out of botActions.js (file was past 300 lines): per-hero item
+      priority lists (swiftsoles + two potions opener, then attribute → mid → capstone
+      by primary), stack-aware `nextBuy` (merged potion stacks count via `count`), and
+      the sustain helpers — `maybePotion` (sip below 60 % HP when no potion is running
+      and nothing from the player for 2 s) and `maybeHeal` (Lumen W below half). The
+      bot holds the potion through combat: the guard arms on *any* damage from the
+      player and on the player casting (incoming pressure), not just magic hits.
+- [x] Generalized cast rules in botActions.js: wave-clear picks the first ready
+      damage/cc slot and aims AoE vs skillshot by radius; ranged trades open with a
+      buff, escape when the player dashes in, cc on cooldown when in range, damage
+      casts gated at ≥ 10 % of the player's max HP; retreats cast stealth/buff/heal by
+      kind. `useItem` resets with the other intent fields each decision pulse.
+- Assumptions (spec silent):
+  - The seeded enemy is FNV-1a of the player key (documented above); `?enemy=` always
+    wins when it names a valid hero.
+  - SHOP holds while `nextBuy` returns anything affordable — the previous gold ≥ 250
+    gate made the bot walk out with one item and never buy its 50 g potions.
+  - A player cast arms the bot's "in combat" guard from wind-up start (the bot cannot
+    know whether the spell is aimed at it, and holding the potion through a combo is
+    correct play).
+  - Bot damage-cast gate: ≥ 10 % of the player's max HP expected damage.
+- Probe: new blocks — hero select (10 assertions, bare page, click a card → match
+  builds), `?enemy=` (3), seeded default (2), bot vaskra/kesh/halvard/lumen behaviour
+  (2–3 each), bot potion buy/sip/hold (4). **156/156 total** (was 129), exit 0, no
+  code errors. Game bugs found: the SHOP gold gate above, and `abilityReady` reading
+  the dead `a.level` field. Probe bug found: `restart()` appended query params to the
+  first page's URL, producing duplicate `hero` params — every "swap hero" page
+  silently booted Brakk (URLSearchParams takes the first value); restart now rebuilds
+  from the bare base URL with a fresh cache-buster, and the first load pins
+  `enemy=ilyra` to keep the old default the earliest blocks assume.
+- Not verifiable by the probe: whether the card grid reads as pickable and the
+  portraits as distinct silhouettes; whether the seeded matchup feels fair; bot
+  potion timing under real pressure (the probe tests the guard, not the judgement).
+
 ## Known gaps, deliberately not in the slice
 
 - Multiplayer. `docs/NETCODE.md` is the decision: server-authoritative at 20 Hz, intents

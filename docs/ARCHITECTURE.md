@@ -20,7 +20,9 @@ Deviations from `docs/DESIGN.md` fixed by the contract (use these, not the doc):
 index.html                 canvas, importmap (three@0.170.0), #start-overlay, #hud
                            (#ability-bar and #shop roots reserved), boot-error script
 src/
-  main.js                  builds every object, per-frame order, window.__game (scaffold)
+  main.js                  boot: builds every object once; ?hero=/?enemy= or the
+                           hero-select overlay picks the matchup, then startMatch wires
+                           heroes, structures, economy, bot, HUD and window.__game
   core/
     engine.js              Engine: renderer/scene/camera/lights/resize/loop      (scaffold)
     events.js              EventBus + shared `events`                             (scaffold)
@@ -61,7 +63,10 @@ src/
     passives.js            the nine item passives, called from the hit paths   ECONOMY+BOT
     shop.js                Shop: consumes intent.buy inside the fountain       ECONOMY+BOT
   ai/
-    heroBot.js             HeroBot: writes the red hero's intent               ECONOMY+BOT
+    heroBot.js             HeroBot: state machine, writes the red hero's intent  ECONOMY+BOT
+    botSense.js            delayed player view, snapshot, BOT_KIT (per-hero cast data) BOT
+    botActions.js          per-state intent writers (farm/trade/retreat/push)    ECONOMY+BOT
+    botBuy.js              per-hero item priority, potion/heal sustain           ECONOMY+BOT
   fx/                      VISUALS ONLY — imports core/, map/ and reads unit state;
                            sim code never imports fx/. Mesh builders here keep the
                            { group, shield } contract and never mutate sim state.

@@ -56,6 +56,31 @@
     #ability-bar { left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; gap: 8px; }
     #shop { right: 20px; top: 60px; display: none; pointer-events: auto; }
 
+    /* --- hero select (src/hud/heroSelect.js) --- */
+    #hero-select { position: fixed; inset: 0; z-index: 11; display: flex;
+                   align-items: center; justify-content: center;
+                   background: radial-gradient(ellipse at center, rgba(8,10,14,.88) 0%, rgba(4,5,8,.97) 100%); }
+    #hero-select.hidden { display: none; }
+    #hero-select .hs-grid { display: grid; grid-template-columns: repeat(3, 240px);
+                            gap: 14px; max-width: 90vw; max-height: 92vh; overflow: auto; }
+    #hero-select .hs-head { position: fixed; top: 5vh; left: 0; right: 0; text-align: center;
+                            font: 700 22px/1 monospace; letter-spacing: .14em; color: #e8e6e0; }
+    #hero-select .hs-card { display: flex; flex-direction: column; gap: 6px; padding: 12px;
+                            background: rgba(16,20,26,.92); border: 1px solid #3a4250;
+                            border-radius: 6px; cursor: pointer; text-align: left; color: #fff;
+                            font-family: inherit; }
+    #hero-select .hs-card:hover { border-color: #3b6fd6; background: rgba(30,38,50,.95); }
+    #hero-select .hs-portrait { width: 72px; height: 72px; border: 1px solid #3a4250;
+                                border-radius: 4px; }
+    #hero-select .hs-name { font: 700 15px/1.2 monospace; color: #e8e6e0; }
+    #hero-select .hs-badge { font: 11px/1 monospace; letter-spacing: .1em;
+                             text-transform: uppercase; color: #8f8d86; }
+    #hero-select .hs-abil { margin-top: 2px; display: flex; flex-direction: column; gap: 3px;
+                            font: 11px/1.4 monospace; }
+    #hero-select .hs-ab-row b { display: inline-block; width: 16px; color: #3b6fd6; }
+    #hero-select .hs-ab-row span { color: #c9c6bd; }
+    #hero-select .hs-passive { font: 10px/1.4 monospace; color: #6c6a64; }
+
     #boot-status { position: fixed; left: 12px; top: 12px; font: 12px/1.4 monospace;
                    color: #9f9; opacity: .8; z-index: 20; }
   </style>
@@ -84,6 +109,11 @@
     <div id="match-banner"></div>
     <div id="ability-bar"></div>
     <div id="shop"></div>
+  </div>
+
+  <div id="hero-select" class="hidden">
+    <div class="hs-head">CHOOSE YOUR HERO</div>
+    <div class="hs-grid"></div>
   </div>
 
   <div id="start-overlay">

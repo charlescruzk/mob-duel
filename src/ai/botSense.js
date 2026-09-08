@@ -7,49 +7,58 @@ import { RADII, TOWER_RANGE, POSITIONS } from '../map/laneData.js';
 export const REACTION_DELAY = 0.3;
 const RING = 64;
 
-// Numbers the bot needs about its own kit: cost, reach, damage scaling, min level.
+// Numbers the bot needs about its own kit (PHASE2.md §6 generic schema): cost,
+// reach, damage scaling, min level and a kind — 'damage' | 'cc' | 'buff' |
+// 'escape' | 'heal' | 'stealth' — that drives the generalized cast rules. Radius
+// rides along for the skillshot line-block test.
 export const BOT_KIT = {
   brakk: {
+    id: 'brakk',
     melee: true,
-    q: { cost: 40, range: 3.0, radius: 3.0, base: 60, step: 15, level: 1 },
-    w: { cost: 50, range: 0, radius: 0, base: 0, step: 0, level: 1 },
-    e: { cost: 55, range: 6.0, radius: 1.5, base: 50, step: 12, level: 1 },
-    r: { cost: 100, range: 3.5, radius: 3.5, base: 140, step: 35, level: 4 },
+    q: { cost: 40, range: 3.0, radius: 3.0, base: 60, step: 15, minLevel: 1, kind: 'damage' },
+    w: { cost: 50, range: 0, radius: 0, base: 0, step: 0, minLevel: 1, kind: 'buff' },
+    e: { cost: 55, range: 6.0, radius: 1.5, base: 50, step: 12, minLevel: 1, kind: 'escape' },
+    r: { cost: 100, range: 3.5, radius: 3.5, base: 140, step: 35, minLevel: 4, kind: 'damage' },
   },
   ilyra: {
+    id: 'ilyra',
     melee: false,
-    q: { cost: 45, range: 11.0, radius: 0.5, base: 70, step: 20, level: 1 },
-    w: { cost: 60, range: 8.0, radius: 2.5, base: 60, step: 18, level: 1 },
-    e: { cost: 50, range: 4.5, radius: 0, base: 0, step: 0, level: 1 },
-    r: { cost: 110, range: 16.0, radius: 0.8, base: 180, step: 45, level: 4 },
+    q: { cost: 45, range: 11.0, radius: 0.5, base: 70, step: 20, minLevel: 1, kind: 'damage' },
+    w: { cost: 60, range: 8.0, radius: 2.5, base: 60, step: 18, minLevel: 1, kind: 'damage' },
+    e: { cost: 50, range: 4.5, radius: 0, base: 0, step: 0, minLevel: 1, kind: 'escape' },
+    r: { cost: 110, range: 16.0, radius: 0.8, base: 180, step: 45, minLevel: 4, kind: 'damage' },
   },
   vaskra: {
+    id: 'vaskra',
     melee: false,
-    q: { cost: 40, range: 14.0, radius: 0.5, base: 65, step: 18, level: 1 },
-    w: { cost: 45, range: 0, radius: 0, base: 0, step: 0, level: 1 },
-    e: { cost: 35, range: 3.5, radius: 0, base: 0, step: 0, level: 1 },
-    r: { cost: 100, range: 30.0, radius: 0.6, base: 150, step: 40, level: 4 },
+    q: { cost: 40, range: 14.0, radius: 0.5, base: 65, step: 18, minLevel: 1, kind: 'damage' },
+    w: { cost: 45, range: 0, radius: 0, base: 0, step: 0, minLevel: 1, kind: 'buff' },
+    e: { cost: 35, range: 3.5, radius: 0, base: 0, step: 0, minLevel: 1, kind: 'escape' },
+    r: { cost: 100, range: 30.0, radius: 0.6, base: 150, step: 40, minLevel: 4, kind: 'damage' },
   },
   kesh: {
+    id: 'kesh',
     melee: true,
-    q: { cost: 45, range: 7.0, radius: 0, base: 55, step: 15, level: 1 },
-    w: { cost: 50, range: 0, radius: 0, base: 0, step: 0, level: 1 },
-    e: { cost: 40, range: 4.5, radius: 0, base: 60, step: 16, level: 1 },
-    r: { cost: 90, range: 5.0, radius: 0, base: 120, step: 30, level: 4 },
+    q: { cost: 45, range: 7.0, radius: 0, base: 55, step: 15, minLevel: 1, kind: 'damage' },
+    w: { cost: 50, range: 0, radius: 0, base: 0, step: 0, minLevel: 1, kind: 'stealth' },
+    e: { cost: 40, range: 4.5, radius: 0, base: 60, step: 16, minLevel: 1, kind: 'damage' },
+    r: { cost: 90, range: 5.0, radius: 0, base: 120, step: 30, minLevel: 4, kind: 'damage' },
   },
   halvard: {
+    id: 'halvard',
     melee: true,
-    q: { cost: 40, range: 2.5, radius: 0, base: 50, step: 14, level: 1 },
-    w: { cost: 50, range: 0, radius: 0, base: 0, step: 0, level: 1 },
-    e: { cost: 55, range: 8.0, radius: 1.2, base: 40, step: 10, level: 1 },
-    r: { cost: 100, range: 5.0, radius: 5.0, base: 120, step: 30, level: 4 },
+    q: { cost: 40, range: 2.5, radius: 0, base: 50, step: 14, minLevel: 1, kind: 'cc' },
+    w: { cost: 50, range: 0, radius: 0, base: 0, step: 0, minLevel: 1, kind: 'buff' },
+    e: { cost: 55, range: 8.0, radius: 1.2, base: 40, step: 10, minLevel: 1, kind: 'cc' },
+    r: { cost: 100, range: 5.0, radius: 5.0, base: 120, step: 30, minLevel: 4, kind: 'cc' },
   },
   lumen: {
+    id: 'lumen',
     melee: false,
-    q: { cost: 50, range: 10.0, radius: 0.6, base: 55, step: 14, level: 1 },
-    w: { cost: 60, range: 0, radius: 0, base: 0, step: 0, level: 1 },
-    e: { cost: 65, range: 7.0, radius: 3.0, base: 50, step: 15, level: 1 },
-    r: { cost: 120, range: 6.0, radius: 5.0, base: 40, step: 12, level: 4 },
+    q: { cost: 50, range: 10.0, radius: 0.6, base: 55, step: 14, minLevel: 1, kind: 'cc' },
+    w: { cost: 60, range: 0, radius: 0, base: 0, step: 0, minLevel: 1, kind: 'heal' },
+    e: { cost: 65, range: 7.0, radius: 3.0, base: 50, step: 15, minLevel: 1, kind: 'cc' },
+    r: { cost: 120, range: 6.0, radius: 5.0, base: 40, step: 12, minLevel: 4, kind: 'damage' },
   },
 };
 
@@ -77,7 +86,7 @@ export function abilityDamage(kit, slot, hero) {
 // Cast preconditions the hero itself will check (cooldown, mana, unlock level).
 export function abilityReady(kit, slot, hero) {
   const a = kit[slot];
-  if ((hero.level || 1) < a.level) return false;
+  if ((hero.level || 1) < (a.minLevel || 1)) return false;
   const cd = hero.cooldowns ? hero.cooldowns[slot] || 0 : 0;
   if (cd > 0) return false;
   const cost = hero.costs && typeof hero.costs[slot] === 'number' ? hero.costs[slot] : a.cost;
