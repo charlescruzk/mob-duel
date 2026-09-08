@@ -168,6 +168,48 @@ state; sim code never imports `fx/`.
 - Not verifiable by the probe: whether stealth actually reads as invisible on screen
   (rendering-side culling arrives with Phase 2 Task 8/9); how root *feels*.
 
+### Task 2 — attributes, 25 items, consumables, shop panel
+
+- [x] Attributes (PHASE2.md §2): `ATTR` conversion table in `heroData.js` — STR +16
+      maxHp/+0.08 hpRegen, AGI +0.004 armor/+0.01 attackSpeed, INT +12 maxMp/
+      +0.06 mpRegen/+0.005 amp; primary attribute adds +1 AD per point. Heroes get
+      `primary: 'str'` (Brakk) / `'int'` (Ilyra). Caps: item+AGI attack speed 1.5,
+      total armor 0.75 (`ARMOR_CAP`, `ATTACK_SPEED_CAP`).
+- [x] 25 items in `economy/items.js` (compact `def()` normalizer + shared field lists
+      in `economy/itemFields.js`): 3 consumables, tiers 1/2/3, nine passives, CDR cap
+      0.30, sell 60 %, stack cap 5. `applyItems` folds all 14 stat fields.
+- [x] Item passives in `economy/passives.js`, hooked at the hit paths per the
+      ARCHITECTURE file map: burn/cleave/tempo/execute/undertow on autos
+      (`heroAttack.land`), rend/flow on ability hits (`abilityLib.abilityHit`),
+      spell shield pre-damage in `abilityHit`, second wind + shield recharge + burn
+      DoT ticked per frame from `match._live`.
+- [x] Consumables: `economy/consumables.js` per-match system — potions tick HoT/mana
+      regen, `intent.useItem` (inventory slot index, −1 none) consumed on the rising
+      edge for either team; Digit1–6 map to slots 0–5 through the controller. Stacks
+      merge to 5 in one slot; cleared on hero death.
+- [x] Shop panel: four tabs (Consumables / Tier 1–3), passive text on items, stack
+      counts (×N) on inventory slots, sell-one-from-stack.
+- Assumptions (spec silent):
+  - `hero.js` was at its ~300-line cap, so item folding lives in `hero/heroItems.js`
+    (`applyItemTo`, `refreshItemStats`, `refreshPassives`, `dropKey`); `hero.applyItem`
+    is a one-line delegate.
+  - Consumable inventory entries are clones built by `shop.buy` via
+    `consumableEntry(def)` — the shared `ITEMS` defs stay immutable; `countItem`
+    matches by key so bot priority lists survive the refactor.
+  - The attack-speed cap applies to the item+AGI stat only; ability attack-speed
+    buffs stack on top of the capped value.
+  - Fleetfoot Greaves silently replaces Swiftsoles (upgrade chain), matching the
+    tier-2-over-tier-1 unique rule.
+  - A potion refresh-replaces any running potion (one HoT at a time) — no stacking.
+  - `intent.useItem` is an inventory slot index (0–5); using a non-consumable slot is
+    a no-op, not an error.
+- Probe: two new blocks — `items: attribute conversion, caps, fleet replacement,
+  consumables` (14 assertions) and `items: passives — burn, cleave, rend, flow, spell
+  shield, tempo, execute, undertow, second wind` (16 assertions), **99/99 total**
+  (was 69), exit 0, no code errors.
+- Not verifiable by the probe: shop tab feel and click targets; whether burn DoT and
+  damage numbers (Task 8) read clearly; item power feel (Task 11 balance pass).
+
 ## Known gaps, deliberately not in the slice
 
 - Multiplayer. `docs/NETCODE.md` is the decision: server-authoritative at 20 Hz, intents

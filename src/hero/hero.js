@@ -8,15 +8,15 @@ import { POSITIONS, RADII, enemyOf, isInFountain } from '../map/laneData.js';
 import {
   HEROES, SLOTS, atLevel, respawnTime, MAX_LEVEL, XP_TO_LEVEL, XP_SHARE_RADIUS,
   RECALL_TIME, FOUNTAIN_REGEN_PCT, FOUNTAIN_LASER_DPS, CDR_CAP, HERO_KILL_GOLD,
+  ATTR, ARMOR_CAP, ATTACK_SPEED_CAP,
 } from './heroData.js';
 import { AbilitySystem } from './abilities.js';
 import { BasicAttack } from './heroAttack.js';
+import { applyItemTo, refreshItemStats, ITEM_KEYS } from './heroItems.js';
 import { buildHeroMesh } from './heroMesh.js';
 import { effects } from './effects.js';
 
 const START_GOLD = 400, EPS = 1e-6;
-const INVENTORY_SLOTS = 6;
-const ITEM_KEYS = ['moveSpeed', 'attackDamage', 'abilityAmp', 'maxHp', 'hpRegen', 'maxMp', 'mpRegen', 'cdr'];
 
 // Reused payloads (EventBus rule: listeners copy fields out).
 const levelPayload = { hero: null, level: 1 };
@@ -38,11 +38,19 @@ export class Hero extends Unit {
     this.prevIntent = { q: false, w: false, e: false, r: false, recall: false };
     this.level = 1; this.xp = 0; this.gold = START_GOLD;
     this.kills = 0; this.deaths = 0;
-    this.items = [];                        // up to INVENTORY_SLOTS item defs
-    this.itemStats = { moveSpeed: 0, attackDamage: 0, abilityAmp: 0, maxHp: 0, hpRegen: 0, maxMp: 0, mpRegen: 0, cdr: 0 };
+    this.items = [];                        // up to INVENTORY_SLOTS item defs (consumables are clones)
+    this.itemStats = { moveSpeed: 0, attackDamage: 0, abilityAmp: 0, maxHp: 0, hpRegen: 0, maxMp: 0, mpRegen: 0, cdr: 0, str: 0, agi: 0, int: 0, attackSpeedPct: 0, lifesteal: 0, armor: 0 };
     this.maxMp = 0; this.mp = 0; this.hpRegen = 0; this.mpRegen = 0;
     this.attackDamage = 0; this.attackRange = data.attackRange; this.attackInterval = data.attackInterval;
     this.abilityAmp = 0; this.cdr = 0;
+    this.itemAttackSpeed = 0; this.lifesteal = 0;       // item/agility-derived (PHASE2.md §2)
+    this.levelArmor = 0; this.itemArmor = 0;
+    this.passives = [];                     // item passive keys, rebuilt on inventory change
+    this.tempoCount = 0; this.undertowArmed = false;    // passives runtime (passives.js)
+    this.shieldReady = false; this.shieldCd = 0;
+    this.swTimer = 0; this.swCd = 0;
+    this.potionHpRate = 0; this.potionHpTimer = 0;      // consumable HoTs (consumables.js ticks)
+    this.potionMpRate = 0; this.potionMpTimer = 0;
     this.goldValue = HERO_KILL_GOLD;
     this.respawnTimer = 0;
     this.isRecalling = false; this.recallTimer = 0;
@@ -78,18 +86,34 @@ export class Hero extends Unit {
   ready(slot) { return this.abilities.ready(slot); }
 
   recomputeStats() {
-    const d = this.data, L = this.level, s = this.itemStats;
-    this.maxHp = atLevel(d.hp, L) + s.maxHp;
-    this.maxMp = atLevel(d.mp, L) + s.maxMp;
-    this.hpRegen = atLevel(d.hpRegen, L) + s.hpRegen;
-    this.mpRegen = atLevel(d.mpRegen, L) + s.mpRegen;
+    const d = this.data, L = this.level, s = this.itemStats, A = ATTR;
+    this.maxHp = atLevel(d.hp, L) + s.maxHp + s.str * A.strMaxHp;
+    this.maxMp = atLevel(d.mp, L) + s.maxMp + s.int * A.intMaxMp;
+    this.hpRegen = atLevel(d.hpRegen, L) + s.hpRegen + s.str * A.strHpRegen;
+    this.mpRegen = atLevel(d.mpRegen, L) + s.mpRegen + s.int * A.intMpRegen;
     this.moveSpeed = d.moveSpeed + s.moveSpeed;
-    this.attackDamage = atLevel(d.attackDamage, L) + s.attackDamage;
-    this.armor = atLevel(d.armor, L);
-    this.abilityAmp = s.abilityAmp;
+    const p = d.primary;
+    const attr = p === 'str' ? s.str : p === 'agi' ? s.agi : s.int;   // primary only (§2)
+    this.attackDamage = atLevel(d.attackDamage, L) + s.attackDamage + attr;
+    this.abilityAmp = s.abilityAmp + s.int * A.intAmp;
     this.cdr = s.cdr > CDR_CAP ? CDR_CAP : s.cdr;
+    let as = s.attackSpeedPct + s.agi * A.agiAttackSpeed;   // buffs stack on top (§2)
+    if (as > ATTACK_SPEED_CAP) as = ATTACK_SPEED_CAP;
+    this.itemAttackSpeed = as;
+    this.lifesteal = s.lifesteal;
+    this.levelArmor = atLevel(d.armor, L);
+    this.itemArmor = s.armor + s.agi * A.agiArmor;
+    this.refreshArmor();
     if (this.hp > this.maxHp) this.hp = this.maxHp;
     if (this.mp > this.maxMp) this.mp = this.maxMp;
+  }
+
+  // Armor = level + items/agility + the strongest armor buff, total capped at 75%.
+  // abilities.js calls this when its buff is applied or expires.
+  refreshArmor() {
+    let a = this.levelArmor + this.itemArmor + this.abilities.armorBuff;
+    if (a > ARMOR_CAP) a = ARMOR_CAP;
+    this.armor = a;
   }
 
   // --- per-frame ---------------------------------------------------------
@@ -201,6 +225,7 @@ export class Hero extends Unit {
     this.deaths++;
     this.respawnTimer = respawnTime(this.level);
     this.cancelRecall();
+    this.potionHpRate = this.potionHpTimer = this.potionMpRate = this.potionMpTimer = 0;
     this.abilities.clearStatus();
     this.attack.reset();
     if (this.shieldMesh) this.shieldMesh.visible = false;
@@ -260,28 +285,17 @@ export class Hero extends Unit {
     events.emit('goldChanged', goldPayload);
   }
 
-  // Shop calls this after paying. Raising max HP/MP raises current by the same amount.
-  applyItem(def) {
-    if (!def || this.items.length >= INVENTORY_SLOTS) return false;
-    this.items.push(def);
-    const s = this.itemStats;
-    for (let k = 0; k < ITEM_KEYS.length; k++) s[ITEM_KEYS[k]] = 0;
-    for (let i = 0; i < this.items.length; i++) {
-      const it = this.items[i];
-      for (let k = 0; k < ITEM_KEYS.length; k++) s[ITEM_KEYS[k]] += it[ITEM_KEYS[k]] || 0;
-    }
-    if (s.cdr > CDR_CAP) s.cdr = CDR_CAP;
-    this.recomputeStats();
-    this.hp += def.maxHp || 0; if (this.hp > this.maxHp) this.hp = this.maxHp;
-    this.mp += def.maxMp || 0; if (this.mp > this.maxMp) this.mp = this.maxMp;
-    return true;
-  }
+  // Shop calls this after paying; the folding lives in heroItems.js.
+  applyItem(def) { return applyItemTo(this, def); }
 
   // Full match reset (level, gold, items, cooldowns, position).
   reset() {
     this.level = 1; this.xp = 0; this.gold = START_GOLD; this.kills = 0; this.deaths = 0;
     this.items.length = 0;
-    for (let k = 0; k < ITEM_KEYS.length; k++) this.itemStats[ITEM_KEYS[k]] = 0;
+    const s = this.itemStats;
+    for (let k = 0; k < ITEM_KEYS.length; k++) s[ITEM_KEYS[k]] = 0;
+    this.passives.length = 0;
+    this.potionHpRate = this.potionHpTimer = this.potionMpRate = this.potionMpTimer = 0;
     this.abilities.resetAll();
     this.attack.reset();
     this.isRecalling = false; this.recallTimer = 0;

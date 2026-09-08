@@ -16,6 +16,15 @@ export const FOUNTAIN_LASER_DPS = 150;       // true damage to enemy heroes in y
 export const CDR_CAP = 0.30;
 export const HERO_KILL_GOLD = 250;
 export const SLOTS = ['q', 'w', 'e', 'r'];
+// Attribute conversion per point (PHASE2.md §2) and derived-stat caps. Attack speed
+// cap applies to the item/agility stat; ability attack-speed buffs stack on top of it.
+export const ATTR = {
+  strMaxHp: 16, strHpRegen: 0.08,
+  agiArmor: 0.004, agiAttackSpeed: 0.01,
+  intMaxMp: 12, intMpRegen: 0.06, intAmp: 0.005,
+};
+export const ARMOR_CAP = 0.75;
+export const ATTACK_SPEED_CAP = 1.5;
 
 export const HEROES = {
   brakk: {
@@ -23,6 +32,7 @@ export const HEROES = {
     name: 'Brakk',
     title: 'the Ironhide',
     role: 'melee bruiser',
+    primary: 'str',
     ranged: false,
     hp: { base: 620, step: 85 },
     mp: { base: 250, step: 25 },
@@ -71,6 +81,7 @@ export const HEROES = {
     name: 'Ilyra',
     title: 'the Cinderweaver',
     role: 'ranged mage',
+    primary: 'int',
     ranged: true,
     hp: { base: 500, step: 65 },
     mp: { base: 380, step: 40 },

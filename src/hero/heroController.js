@@ -21,6 +21,7 @@ export class HeroController {
       intent.moveX = 0; intent.moveZ = 0; intent.attack = false;
       intent.q = intent.w = intent.e = intent.r = intent.recall = false;
       intent.buy = -1;
+      intent.useItem = -1;
       return intent;
     }
 
@@ -42,10 +43,13 @@ export class HeroController {
     intent.e = inp.justPressed('KeyE');
     intent.r = inp.justPressed('KeyR');
     intent.recall = inp.justPressed('KeyB');
-    intent.buy = inp.justPressed('Digit1') ? 0
+    // Digit1–6 use inventory slots 0–5 (PHASE2.md §4); buying is shop-panel only.
+    intent.useItem = inp.justPressed('Digit1') ? 0
       : inp.justPressed('Digit2') ? 1
       : inp.justPressed('Digit3') ? 2
-      : inp.justPressed('Digit4') ? 3 : -1;
+      : inp.justPressed('Digit4') ? 3
+      : inp.justPressed('Digit5') ? 4
+      : inp.justPressed('Digit6') ? 5 : -1;
 
     // Aim: camera-centre ray ∩ ground, clamped to AIM_MAX from the hero. If the ray
     // misses the ground (looking above the horizon) aim AIM_MAX ahead along the camera.

@@ -16,6 +16,7 @@ export class Match {
     // Intent writers. The probe sets either to null to write that intent by hand.
     this.controller = g.controller; this.bot = g.bot;
     this.waves = g.waves; this.shop = g.shop; this.gold = g.gold; this.effects = g.effects;
+    this.consumables = g.consumables; this.passives = g.passives;
     this.towers = g.towers; this.nexuses = g.nexuses;
     this.camera = g.camera; this.hud = g.hud; this.abilityBar = g.abilityBar; this.shopPanel = g.shopPanel;
     this.state = 'countdown';
@@ -53,7 +54,9 @@ export class Match {
     if (this.bot) this.bot.update(dt);
     this.waves.update(dt);
     this.shop.update(dt);
+    if (this.consumables) this.consumables.update(dt);
     this.gold.update(dt);
+    if (this.passives) this.passives.update(this.world, dt);
     this.world.update(dt);
     this.effects.update(dt);
     this._present(dt);
@@ -134,6 +137,8 @@ export class Match {
     }
     this.gold.reset();
     this.shop.reset();
+    if (this.consumables) this.consumables.reset();
+    if (this.passives) this.passives.reset(this.world);
     if (this.bot) this.bot.reset();
     this.abilityBar.invalidate();
     this.hud.invalidate();

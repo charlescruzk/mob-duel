@@ -11,8 +11,10 @@ const LEAD = 0.25;
 const LAST_HIT = 0.9;
 const FLIGHT = 0.35;
 
-// Item priority per kit (indices into ITEMS; repeats = second copy).
-const PRIORITY = { brakk: [0, 1, 2, 1, 2], ilyra: [0, 3, 1, 2, 1] };
+// Item indices into ITEMS (intent.buy order): swiftsoles 2, oxbelt 4, wardenplate 14,
+// whetstone 9, ironring 3 for the bruiser; sapphirebead 6, aether 11, stormglass 15,
+// voidlens 18 for the mage. Full build-priority work arrives with the bot rework.
+const PRIORITY = { brakk: [2, 4, 14, 9, 3], ilyra: [2, 6, 11, 15, 18] };
 const need = [0, 0, 0, 0];
 
 function ad(hero) { return hero.attackDamage || 62; }

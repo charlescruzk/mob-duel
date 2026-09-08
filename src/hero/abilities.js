@@ -142,7 +142,10 @@ export class AbilitySystem {
     if (this.rootTimer > 0) { this.rootTimer -= dt; if (this.rootTimer <= EPS) this.rootTimer = 0; }
     if (this.stealthTimer > 0) { this.stealthTimer -= dt; if (this.stealthTimer <= EPS) this.stealthTimer = 0; }
     if (this.atkSpdTimer > 0) { this.atkSpdTimer -= dt; if (this.atkSpdTimer <= EPS) this.atkSpdTimer = 0; }
-    if (this.armorBuffTimer > 0) { this.armorBuffTimer -= dt; if (this.armorBuffTimer <= EPS) this.armorBuffTimer = 0; }
+    if (this.armorBuffTimer > 0) {
+      this.armorBuffTimer -= dt;
+      if (this.armorBuffTimer <= EPS) { this.armorBuffTimer = 0; hero.refreshArmor(); }   // buff fell off
+    }
     if (this.reflectTimer > 0) { this.reflectTimer -= dt; if (this.reflectTimer <= EPS) this.reflectTimer = 0; }
     if (this.bonusAutoTimer > 0) { this.bonusAutoTimer -= dt; if (this.bonusAutoTimer <= EPS) this.bonusAutoTimer = 0; }
     this._tickMarks(dt);
@@ -187,7 +190,7 @@ export class AbilitySystem {
     } else if (kind === 'attackSpeed') {
       if (magnitude >= this.atkSpdPct) { this.atkSpdPct = magnitude; this.atkSpdTimer = seconds; }
     } else if (kind === 'armorBuff') {
-      if (magnitude >= this.armorBuffVal) { this.armorBuffVal = magnitude; this.armorBuffTimer = seconds; }
+      if (magnitude >= this.armorBuffVal) { this.armorBuffVal = magnitude; this.armorBuffTimer = seconds; this.hero.refreshArmor(); }
     } else if (kind === 'reflect') {
       this.reflectVal = magnitude;
       this.reflectTimer = seconds;
@@ -248,6 +251,7 @@ export class AbilitySystem {
     this.armorBuffTimer = 0; this.armorBuffVal = 0;
     this.reflectTimer = 0; this.reflectVal = 0;
     this.bonusAutoTimer = 0; this.bonusAutoDmg = 0;
+    this.hero.refreshArmor();
     this.hero.shield = 0;
     this.cast.def = null; this.cast.timer = 0; this.cast.slot = '';
     this.dash.active = false;

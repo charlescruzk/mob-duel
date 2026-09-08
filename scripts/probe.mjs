@@ -402,6 +402,206 @@ async function main() {
     } catch (e) { return { error: String((e && e.stack) || e) }; }
   })()`);
 
+  await block('items: attribute conversion, caps, fleet replacement, consumables', `(async () => {
+    try {
+    ${SETUP}
+    const I = H.intent;
+    const shop = g.shop;
+    // Attribute conversion (PHASE2.md §2). Oxbelt = +12 STR on the STR-primary hero:
+    // +192 max HP, +0.96 HP regen, +12 attack damage (primary only).
+    H.gold = 99999; E.gold = 99999;
+    const hp0 = H.maxHp, ad0 = H.attackDamage, rg0 = H.hpRegen;
+    r.attributeStr = shop.buy(H, 'oxbelt')
+      && near(H.maxHp - hp0, 12 * 16, 1e-6)
+      && near(H.hpRegen - rg0, 12 * 0.08, 1e-6)
+      && near(H.attackDamage - ad0, 12, 1e-6);
+    // Agility on a STR hero: armor (+0.048) and attack speed (+0.12) only.
+    const ad1 = H.attackDamage;
+    shop.buy(H, 'featherband');
+    r.attributeAgi = near(H.itemArmor, 0.048, 1e-6) && near(H.itemAttackSpeed, 0.12, 1e-6)
+      && near(H.attackDamage, ad0 + 12, 1e-6);
+    // Intellect: on Ilyra (INT primary) it adds attack damage; on Brakk it does not.
+    const ead0 = E.attackDamage;
+    shop.buy(E, 'sapphirebead');
+    shop.buy(H, 'sapphirebead');
+    r.attributeInt = near(E.attackDamage - ead0, 12, 1e-6)
+      && near(H.attackDamage, ad0 + 12, 1e-6)
+      && near(H.maxMp, 250 + 144, 1e-6)
+      && near(H.abilityAmp, 0.06, 1e-6);
+    // Unique + replacement: Swiftsoles refused twice, Fleetfoot Greaves replaces it.
+    r.uniqueRefused = shop.buy(H, 'swiftsoles') && !shop.buy(H, 'swiftsoles');
+    shop.buy(H, 'fleetgreaves');                   // replaces the unique it upgrades
+    let hasFleet = false, hasSoles = false;
+    for (let i = 0; i < H.items.length; i++) {
+      if (H.items[i].key === 'fleetgreaves') hasFleet = true;
+      if (H.items[i].key === 'swiftsoles') hasSoles = true;
+    }
+    r.fleetReplacesSwiftsoles = hasFleet && !hasSoles && near(H.itemStats.moveSpeed, 0.9, 1e-6);
+    // Caps: item attack speed clamps at +150%, total armor at 0.75.
+    H.itemStats.attackSpeedPct = 3.0; H.recomputeStats();
+    r.attackSpeedCap = near(H.itemAttackSpeed, 1.5, 1e-6);
+    H.itemStats.armor = 1.0; H.recomputeStats();
+    r.armorCap = near(H.armor, 0.75, 1e-6);
+    H.itemStats.attackSpeedPct = 0; H.itemStats.armor = 0; H.recomputeStats();
+    // Consumables: 5 potions merge into one slot, the 6th opens a second.
+    let ok = true;
+    for (let i = 0; i < 6; i++) ok = ok && shop.buy(H, 'hpotion');
+    r.consumableStacks = ok
+      && H.items.length === 6
+      && H.items[4].key === 'hpotion' && H.items[4].count === 5
+      && H.items[5].key === 'hpotion' && H.items[5].count === 1;
+    // 4 more fill the second stack (5 + 5 = 10 capacity); an 11th is refused —
+    // the inventory is full (4 items + 2 full potion slots = 6).
+    for (let i = 0; i < 4; i++) shop.buy(H, 'hpotion');
+    const goldBefore = H.gold;
+    r.slotsFullRefused = H.items[5].count === 5 && !shop.buy(H, 'hpotion')
+      && H.gold === goldBefore;
+    // Mid-lane for combat maths (no fountain laser, no tower aggro).
+    H.teleport(0, 10); E.teleport(0, 8.5); fresh(H); fresh(E);
+    H.mp = H.maxMp;
+    // Attack speed scales the interval: base 1.0 ÷ (1 + 1.5) = 0.4 s. The start
+    // frame arms the full timer without decrementing (update decrements first).
+    H.itemStats.attackSpeedPct = 3.0; H.itemStats.lifesteal = 0.5; H.recomputeStats();
+    H.hp = H.maxHp - 250;                            // leave headroom for the heals
+    I.aimX = E.pos.x; I.aimZ = E.pos.z; I.attack = true;
+    step(0.05);
+    r.attackSpeedScalesInterval = near(H.attack.timer, 0.4, 0.01)
+      && near(H.attack.windup, 0.25, 0.01);          // wind-up not scaled
+    const ehp0 = E.hp, hhp0 = H.hp;
+    step(0.25);                                      // wind-up ends → the auto lands
+    I.attack = false;
+    const dealt = ehp0 - E.hp;
+    const rise = H.hp - hhp0;
+    // Lifesteal 0.5 × dealt, plus Ironhide 6 × 3 = 18 vs heroes at level 1
+    // (6 + 2/level means +2 per level after the first).
+    r.lifestealHeals = dealt > 40 && near(rise, dealt * 0.5 + 18, 3.0);
+    H.itemStats.attackSpeedPct = 0; H.recomputeStats();
+    // Use-item edge: slot 4 (the stacked potions) starts a 150 HP / 10 s regen,
+    // count drops 5 → 4.
+    H.hp -= 300;
+    I.useItem = 4; step(0.05); I.useItem = -1;
+    r.useItemEdge = near(H.potionHpTimer, 10, 0.02) && near(H.potionHpRate, 15, 1e-6)
+      && H.items[4].count === 4;
+    const hhp1 = H.hp;
+    step(1.0);
+    r.potionHealsOverTime = H.hp - hhp1 > 10;        // ~15 HP, minus drift
+    // Digit1 maps to inventory slot 0 through the controller (synthetic keydown):
+    // the intent carries 0, and since slot 0 is the Oxbelt, no potion is popped.
+    m.controller = g.controller;
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit1' }));
+    step(0.05);
+    m.controller = null;
+    r.digitUsesSlot0 = H.intent.useItem === 0 && H.items[4].count === 4;
+    // Everything clears on death: potion stacks, timers, passive runtime state.
+    H.passives.length = 0; H.passives.push('tempo');
+    H.tempoCount = 7; H.undertowArmed = true; E.shieldReady = true; E.shieldCd = 3;
+    H.takeDamage(99999, E, 'true');
+    step(0.05);
+    let potions = 0;
+    for (let i = 0; i < H.items.length; i++) if (H.items[i].consumable) potions++;
+    r.consumablesClearOnDeath = H.alive === false && potions === 0
+      && H.potionHpTimer === 0 && H.potionMpTimer === 0
+      && H.tempoCount === 0 && H.undertowArmed === false;
+    return r;
+    } catch (e) { return { error: String((e && e.stack) || e) }; }
+  })()`);
+
+  await block('items: passives — burn, cleave, rend, flow, spell shield, tempo, execute, undertow, second wind', `(async () => {
+    try {
+    ${SETUP}
+    const P = await import('/src/economy/passives.js');
+    const Minion = (await import('/src/units/minion.js')).Minion;
+    const I = H.intent;
+    H.gold = 99999;
+    // Lone rooted minions at mid-lane keep position maths exact.
+    const spawn = (x) => {
+      const mn = W.add(new Minion('red', W, g.engine.scene, { x: x, y: 0, z: 20 }, { ranged: false, wave: 0 }));
+      mn.applyStatus('root', 30, 1);
+      return mn;
+    };
+    // Burn: an auto marks the target; 15 + 2/lvl magic over 2 s ticks afterwards.
+    const mn = spawn(5);
+    H.passives.length = 0; H.passives.push('burn');
+    step(0.1);
+    P.onAutoLand(H, mn);
+    const bz0 = mn.hp;
+    r.burnApplied = near(mn.burnTimer, 2, 0.02);
+    step(0.5);
+    r.burnTicks = mn.alive && mn.burnTimer > 0 && mn.hp < bz0 - 3;
+    W.remove(mn); g.step(0.05);
+    // Cleave: 30% of attack damage to units within 2 m of the target, target excluded.
+    const mnA = spawn(5), mnB = spawn(6.4);
+    step(0.1);
+    H.passives.length = 0; H.passives.push('cleave');
+    const bA = mnA.hp, bB = mnB.hp;
+    P.onAutoLand(H, mnA);
+    r.cleaveSideswipe = near(mnA.hp, bA, 1e-6) && near(bB - mnB.hp, 62 * 0.3, 1e-3);
+    W.remove(mnA); W.remove(mnB); g.step(0.05);
+    // Tempo: every third landed auto deals +40 magic.
+    const mn2 = spawn(5);
+    H.passives.length = 0; H.passives.push('tempo');
+    H.tempoCount = 0;
+    step(0.1);
+    const t0 = mn2.hp;
+    P.onAutoLand(H, mn2); P.onAutoLand(H, mn2);
+    const drop2 = t0 - mn2.hp;
+    P.onAutoLand(H, mn2);
+    r.tempoThirdAuto = H.tempoCount === 3 && near((t0 - mn2.hp) - drop2, 40, 1e-3);
+    W.remove(mn2); g.step(0.05);
+    // Execute: autos vs heroes below 40% HP gain +15% of attack damage.
+    H.passives.length = 0; H.passives.push('execute');
+    E.hp = E.maxHp * 0.3;
+    r.executeBonus = near(P.autoBonusDamage(H, E), H.attackDamage * 0.15, 1e-6);
+    E.hp = E.maxHp * 0.6;
+    r.executeThreshold = P.autoBonusDamage(H, E) === 0;
+    E.hp = E.maxHp;
+    // Rend and Flow, resolved after an ability hit.
+    H.passives.length = 0; H.passives.push('rend');
+    const rhp0 = E.hp;
+    P.onAbilityHit(H, E, 50);
+    r.rendBonusDamage = near(rhp0 - E.hp, E.maxHp * 0.04 * (1 - E.armor), 1e-3);
+    H.passives.length = 0; H.passives.push('flow');
+    H.mp = 10;
+    P.onAbilityHit(H, E, 50);
+    r.flowRefundsMp = near(H.mp, 15, 1e-6);
+    H.passives.length = 0;
+    // Spell Shield: E's first enemy ability hit is eaten, then it recharges.
+    E.passives = ['spellShield'];
+    E.shieldReady = true; E.shieldCd = 0;
+    E.teleport(0, 9); H.teleport(0, 10); fresh(H); H.mp = H.maxMp;
+    const shp0 = E.hp;
+    edge(I, 'q'); step(0.1);
+    r.spellShieldBlocks = near(E.hp, shp0, 0.5) && E.shieldReady === false && E.shieldCd > 0;
+    E.shieldCd = 0.5; step(0.6);
+    r.spellShieldRecharges = E.shieldReady === true && E.shieldCd === 0;
+    E.passives = [];
+    // Undertow: a cast arms the next auto to slow its target 30% for 1 s.
+    H.passives.length = 0; H.passives.push('undertow');
+    const mn3 = spawn(5);
+    step(0.1);
+    edge(I, 'w'); step(0.1);                       // any successful cast arms it
+    r.undertowArmsOnCast = H.undertowArmed === true;
+    P.onAutoLand(H, mn3);
+    r.undertowSlowsNextAuto = H.undertowArmed === false
+      && mn3.slowTimer > 0 && near(mn3.slowPct, 0.3, 1e-6);
+    W.remove(mn3); g.step(0.05);
+    H.passives.length = 0;
+    // Second Wind: below 30% HP it triggers once and heals 15% max over 4 s.
+    H.passives.length = 0; H.passives.push('secondWind');
+    H.hp = H.maxHp * 0.2;
+    step(0.15);
+    r.secondWindTriggers = H.swTimer > 0 && H.swCd > 59;    // cd ticks after the trigger
+    const whp0 = H.hp;
+    step(1.0);
+    r.secondWindHeals = H.hp - whp0 > 15;          // ~23 HP of the 15%-over-4s heal
+    H.passives.length = 0;
+    // The panel shows 25 items across four tabs.
+    r.panelTabsAndItems = document.querySelectorAll('#shop .sp-tab').length === 4
+      && document.querySelectorAll('#shop .sp-item').length === 25;
+    return r;
+    } catch (e) { return { error: String((e && e.stack) || e) }; }
+  })()`);
+
   ws.close();
   try { server.kill('SIGKILL'); } catch { /* gone */ }
   try { chrome.kill('SIGKILL'); } catch { /* gone */ }

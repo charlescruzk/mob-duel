@@ -9,8 +9,10 @@
 //                may hold true for several frames (the bot holds intent 0.2 s) — that
 //                is one cast, not many.
 //   recall       same edge rule as casts
-//   buy          -1 = nothing; 0..3 = item index (DESIGN.md §8 order). The shop
+//   buy          -1 = nothing; 0..24 = item index (DESIGN.md §8 order). The shop
 //                consumes it on the rising edge (previous value was -1).
+//   useItem      -1 = nothing; 0..5 = inventory slot (PHASE2.md §4). The consumables
+//                system consumes it on the rising edge, from anywhere.
 
 export function makeIntent() {
   return {
@@ -20,6 +22,7 @@ export function makeIntent() {
     q: false, w: false, e: false, r: false,
     recall: false,
     buy: -1,
+    useItem: -1,
   };
 }
 
@@ -30,6 +33,7 @@ export function clearIntent(i) {
   i.q = false; i.w = false; i.e = false; i.r = false;
   i.recall = false;
   i.buy = -1;
+  i.useItem = -1;
   return i;
 }
 
@@ -40,5 +44,6 @@ export function copyIntent(dst, src) {
   dst.q = src.q; dst.w = src.w; dst.e = src.e; dst.r = src.r;
   dst.recall = src.recall;
   dst.buy = src.buy;
+  dst.useItem = src.useItem;
   return dst;
 }

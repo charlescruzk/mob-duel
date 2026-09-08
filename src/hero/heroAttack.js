@@ -4,6 +4,7 @@
 // Brakk's life-on-hit and Ilyra's mark consumption.
 import { TEAM_COLOR } from '../map/laneData.js';
 import { atLevel } from './heroData.js';
+import * as passives from '../economy/passives.js';
 import { effects } from './effects.js';
 
 const RANGE_LENIENCY = 0.75;      // target may drift this far out of range during the wind-up
@@ -49,7 +50,9 @@ export class BasicAttack {
     if (!t) return;
     this.target = t;
     this.windup = hero.data.windup;
-    this.timer = hero.attackInterval;
+    // Attack speed: interval ÷ (1 + pct); item/agility stat capped in recomputeStats,
+    // ability buffs stack on top (PHASE2.md §2).
+    this.timer = hero.attackInterval / (1 + hero.itemAttackSpeed + hero.abilities.attackSpeedPct);
     hero.onAttackStart();
   }
 
@@ -101,7 +104,7 @@ export class BasicAttack {
     p.dtype = 'physical';
   }
 
-  // One physical damage instance plus the on-hit passive. Returns HP dealt.
+  // One physical damage instance plus the on-hit passives. Returns HP dealt.
   land(u) {
     const hero = this.hero;
     if (!u.alive || u.invulnerable) return 0;
@@ -109,7 +112,11 @@ export class BasicAttack {
     const passive = hero.data.passive;
     let dmg = hero.attackDamage;
     if (sys.marksEnabled && sys.consumeMark(u)) dmg += atLevel(passive.bonus, hero.level);
+    if (sys.bonusAutoTimer > 0) { dmg += sys.bonusAutoDmg; sys.bonusAutoTimer = 0; sys.bonusAutoDmg = 0; }
+    dmg += passives.autoBonusDamage(hero, u);
     const dealt = u.takeDamage(dmg, hero, 'physical');
+    if (hero.lifesteal > 0 && dealt > 0 && hero.alive) hero.heal(dealt * hero.lifesteal);
+    passives.onAutoLand(hero, u);
     if (passive.kind === 'lifeOnHit' && hero.alive) {
       const heal = atLevel(passive.heal, hero.level) * (u.kind === 'hero' ? passive.heroMult : 1);
       hero.heal(heal);

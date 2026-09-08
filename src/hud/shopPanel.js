@@ -1,12 +1,26 @@
 // Shop panel: fills the reserved #shop root. Collapsed hint while the player stands in
 // the fountain; P opens the full panel (pointer lock released so items are clickable),
-// P / close / clicking back into the game re-locks. Built once, updated in place,
-// every DOM lookup guarded. Buying goes through Shop.buy — the same path as Digit1–4.
+// P / close / clicking back into the game re-locks. Four tabs (Consumables / Tier 1-3).
+// Built once, updated in place, every DOM lookup guarded. Buying goes through Shop.buy.
 import { ITEMS, INVENTORY_SLOTS, SELL_RATIO } from '../economy/items.js';
 
 const REASON_TEXT = {
   ok: '', unknown: '', dead: 'Dead', fountain: 'Leave fountain to close',
   slots: 'Inventory full', unique: 'Already owned', gold: 'Not enough gold',
+};
+
+const TAB_LABELS = ['Consumables', 'Tier 1', 'Tier 2', 'Tier 3'];
+
+const PASSIVE_TEXT = {
+  burn: 'Burn: autos deal 15+2/lvl magic over 2 s',
+  cleave: 'Cleave: autos also hit enemies near the target for 30%',
+  rend: 'Rend: ability hits deal +4% target max HP magic',
+  secondWind: 'Second Wind: below 30% HP, heal 15% max over 4 s (60 s CD)',
+  tempo: 'Tempo: every 3rd auto deals +40 magic',
+  spellShield: 'Spell Shield: blocks one enemy ability hit (40 s CD)',
+  flow: 'Flow: each ability hit refunds 5 MP',
+  execute: 'Execute: autos vs heroes below 40% HP deal +15%',
+  undertow: 'Undertow: after a cast, your next auto slows 30% for 1 s',
 };
 
 const CSS =
@@ -18,6 +32,9 @@ const CSS =
   '#shop button{font:inherit;color:inherit;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.2);' +
   'border-radius:4px;cursor:pointer;text-align:left}' +
   '#shop button:hover{background:rgba(255,255,255,.14)}' +
+  '#shop .sp-tabs{display:flex;gap:4px;margin-bottom:6px}' +
+  '#shop .sp-tab{flex:1;padding:3px 4px;text-align:center;font-size:11px}' +
+  '#shop .sp-tab.on{background:rgba(242,200,75,.22);border-color:rgba(242,200,75,.6)}' +
   '#shop .sp-item{display:block;width:100%;padding:6px 8px;margin-bottom:6px}' +
   '#shop .sp-item.off{opacity:.42;cursor:not-allowed}' +
   '#shop .sp-item b{display:inline-block;min-width:150px}#shop .sp-item i{color:#f2c84b;font-style:normal}' +
@@ -39,8 +56,10 @@ export class ShopPanel {
     this._awaitUnlock = false;
     this._visible = false;
     this._gold = -1;
-    this._reasons = ['', '', '', ''];
+    this._reasons = new Array(ITEMS.length).fill('');
     this._slots = [null, null, null, null, null, null];
+    this._slotCounts = [-1, -1, -1, -1, -1, -1];
+    this._tab = -1;
     this._msg = '';
     this.itemEls = [];
     this.slotEls = [];
@@ -74,21 +93,45 @@ export class ShopPanel {
     head.appendChild(title); head.appendChild(this.goldEl); head.appendChild(close);
     this.body.appendChild(head);
 
+    // Four tabs: Consumables (tier 'c') and Tiers 1-3. One container per tab, built
+    // once; switching only toggles container visibility.
+    const tabs = document.createElement('div');
+    tabs.className = 'sp-tabs';
+    this.tabEls = [];
+    this.tabPanes = [];
+    for (let t = 0; t < TAB_LABELS.length; t++) {
+      const tb = document.createElement('button');
+      tb.className = 'sp-tab';
+      tb.textContent = TAB_LABELS[t];
+      tb.addEventListener('click', () => this._setTab(t));
+      tabs.appendChild(tb);
+      this.tabEls.push(tb);
+      const pane = document.createElement('div');
+      pane.hidden = true;
+      this.body.appendChild(pane);
+      this.tabPanes.push(pane);
+    }
+    this.body.appendChild(tabs);
+
     for (let i = 0; i < ITEMS.length; i++) {
       const it = ITEMS[i];
       const b = document.createElement('button');
       b.className = 'sp-item';
       const name = document.createElement('b');
-      name.textContent = (i + 1) + '. ' + it.name;
+      name.textContent = it.name;
       const cost = document.createElement('i');
       cost.textContent = it.cost + ' g';
       const stats = document.createElement('small');
-      stats.textContent = it.stats + (it.unique ? ' (unique)' : '');
+      const desc = it.stats + (it.unique ? ' (unique)' : '');
+      const pv = PASSIVE_TEXT[it.passive];
+      stats.textContent = pv ? desc + ' — ' + pv : desc;
       b.appendChild(name); b.appendChild(cost); b.appendChild(stats);
       b.addEventListener('click', () => this._onBuy(i));
-      this.body.appendChild(b);
+      const tier = it.tier === 'c' ? 0 : it.tier;
+      this.tabPanes[tier].appendChild(b);
       this.itemEls.push(b);
     }
+    this._setTab(0);
 
     const inv = document.createElement('div');
     inv.className = 'sp-inv';
@@ -109,6 +152,15 @@ export class ShopPanel {
     foot.textContent = 'click an owned slot to sell at ' + Math.round(SELL_RATIO * 100) + '%';
     this.body.appendChild(foot);
     root.appendChild(this.body);
+  }
+
+  _setTab(t) {
+    if (t === this._tab || !this.tabEls) return;
+    this._tab = t;
+    for (let i = 0; i < this.tabEls.length; i++) {
+      this.tabEls[i].classList.toggle('on', i === t);
+      this.tabPanes[i].hidden = i !== t;
+    }
   }
 
   _onBuy(i) {
@@ -186,9 +238,11 @@ export class ShopPanel {
     const inv = hero.items;
     for (let i = 0; i < this.slotEls.length; i++) {
       const it = inv && i < inv.length ? inv[i] : null;
-      if (it !== this._slots[i]) {
+      const n = it && it.consumable ? it.count : 1;
+      if (it !== this._slots[i] || n !== this._slotCounts[i]) {
         this._slots[i] = it;
-        this.slotEls[i].textContent = it ? it.name : '—';
+        this._slotCounts[i] = n;
+        this.slotEls[i].textContent = it ? it.name + (n > 1 ? ' ×' + n : '') : '—';
         this.slotEls[i].classList.toggle('full', !!it);
       }
     }

@@ -5,6 +5,7 @@
 import { resolveCircleVsBoxes, clampToBounds } from '../core/physics.js';
 import { TEAM_COLOR } from '../map/laneData.js';
 import { atLevel } from './heroData.js';
+import * as passives from '../economy/passives.js';
 import { effects } from './effects.js';
 
 const hits = [];                       // world.enemiesInRadius out-array
@@ -38,10 +39,13 @@ export function applyStatusTo(unit, kind, seconds, magnitude) {
   if (typeof unit.applyStatus === 'function') unit.applyStatus(kind, seconds, magnitude);
 }
 
-// One ability damage instance. Returns HP dealt. Marks the target for Ilyra's passive.
+// One ability damage instance. Returns HP dealt. Marks the target for Ilyra's
+// passive; Null Veil's spell shield eats the hit; Flow/Rend resolve afterwards.
 export function abilityHit(hero, sys, unit, raw) {
   if (!unit.alive || unit.invulnerable || unit.kind === 'tower' || unit.kind === 'nexus') return 0;
+  if (passives.blockedBySpellShield(hero, unit)) return 0;
   const dealt = unit.takeDamage(raw, hero, 'magic');
+  passives.onAbilityHit(hero, unit, dealt);
   if (sys.marksEnabled && unit.alive) sys.markUnit(unit);
   return dealt;
 }

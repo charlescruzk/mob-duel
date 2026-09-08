@@ -21,6 +21,8 @@ import { Nexus } from './units/nexus.js';
 import { WaveSpawner } from './units/waveSpawner.js';
 import { Economy } from './economy/gold.js';
 import { Shop } from './economy/shop.js';
+import { Consumables } from './economy/consumables.js';
+import { initPassives } from './economy/passives.js';
 import { ShopPanel } from './hud/shopPanel.js';
 import { HeroBot } from './ai/heroBot.js';
 import { Match } from './game/match.js';
@@ -73,13 +75,15 @@ function boot() {
   // world, so both heroes must already be registered.
   const gold = new Economy(world, [hero, enemy]);
   const shop = new Shop(world);
+  const consumables = new Consumables(world);
+  const passives = initPassives();
   const bot = new HeroBot(enemy, world);
   const abilityBar = new AbilityBar(hero);
   const shopPanel = new ShopPanel(shop, input, hero);
 
   const match = new Match({
     world, scene, input, hero, enemy, controller, bot, waves, shop, gold, effects,
-    towers, nexuses, camera, hud, abilityBar, shopPanel,
+    towers, nexuses, camera, hud, abilityBar, shopPanel, consumables, passives,
   });
 
   // Start gate and pointer lock. Opening the shop releases the lock on purpose, so
@@ -116,6 +120,7 @@ function boot() {
   const game = {
     engine, input, events, world, camera, controller, intent, map, hud,
     hero, enemy, bot, towers, nexuses, waves, gold, shop, shopPanel, abilityBar,
+    consumables, passives,
     effects, match, laneData: { POSITIONS, TEAMS, LANE_BOUNDS },
     three: THREE.REVISION,
     // Probe controls: `paused` stops the loop from simulating so step(dt) is the only

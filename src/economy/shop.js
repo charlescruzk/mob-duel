@@ -3,12 +3,21 @@
 // shop panel and the bot go through the same canBuy/buy/sell API.
 import { events } from '../core/events.js';
 import { TEAMS, isInFountain } from '../map/laneData.js';
-import { ITEMS, INVENTORY_SLOTS, SELL_RATIO, resolveItem, countItem, ensureInventory, applyItems } from './items.js';
+import { ITEMS, INVENTORY_SLOTS, SELL_RATIO, STACK_MAX, resolveItem, countItem, ensureInventory, applyItems, consumableEntry } from './items.js';
 import { emitGold } from './gold.js';
 
 // Reused payloads.
 const boughtPayload = { hero: null, item: null };
 const soldPayload = { hero: null, item: null, refund: 0 };
+
+// True when the hero owns a consumable stack of this key with room for one more.
+function stackable(hero, item) {
+  const inv = hero.items;
+  for (let i = 0; i < inv.length; i++) {
+    if (inv[i].consumable && inv[i].key === item.key && inv[i].count < STACK_MAX) return true;
+  }
+  return false;
+}
 
 export class Shop {
   constructor(world) {
@@ -28,8 +37,14 @@ export class Shop {
     if (hero.alive === false) return 'dead';
     if (!isInFountain(hero.pos, hero.team)) return 'fountain';
     ensureInventory(hero);
-    if (hero.items.length >= INVENTORY_SLOTS) return 'slots';
-    if (item.unique && countItem(hero, item) > 0) return 'unique';
+    if (item.consumable) {
+      // A potion merges into an existing stack with room; only a full stack (or a
+      // full inventory) needs a free slot.
+      if (!stackable(hero, item) && hero.items.length >= INVENTORY_SLOTS) return 'slots';
+    } else {
+      if (hero.items.length >= INVENTORY_SLOTS) return 'slots';
+      if (item.unique && countItem(hero, item) > 0) return 'unique';
+    }
     if ((hero.gold || 0) < item.cost) return 'gold';
     return 'ok';
   }
@@ -39,10 +54,12 @@ export class Shop {
   }
 
   // Pays, stores the item, recomputes hero.itemStats, then hands the def to the
-  // hero's own applyItem hook (contract). Returns true on success.
+  // hero's own applyItem hook (contract). Consumables go in as a fresh per-hero
+  // stack entry so the shared def stays immutable. Returns true on success.
   buy(hero, itemRef) {
     if (!this.canBuy(hero, itemRef)) return false;
-    const item = resolveItem(itemRef);
+    const def = resolveItem(itemRef);
+    const item = def.consumable ? consumableEntry(def) : def;
     hero.gold -= item.cost;
     // Hero.applyItem stores the def and recomputes its own stats; the fallback path
     // (placeholder heroes) keeps hero.items / hero.itemStats consistent itself.
@@ -55,13 +72,23 @@ export class Shop {
     return true;
   }
 
-  // Sells the item in inventory slot `slot` for 60% of cost (fountain only).
+  // Sells one copy from inventory slot `slot` for 60% of cost (fountain only).
+  // A potion stack loses one copy and keeps its slot.
   sell(hero, slot) {
     if (!hero || hero.alive === false || !hero.items) return false;
     if (!isInFountain(hero.pos, hero.team)) return false;
     const inv = hero.items;
     if (slot < 0 || slot >= inv.length) return false;
     const item = inv[slot];
+    if (item.consumable && item.count > 1) {
+      item.count--;
+      const refund = Math.floor(item.cost * SELL_RATIO);
+      hero.gold = (hero.gold || 0) + refund;
+      emitGold(hero, refund, 'sell');
+      soldPayload.hero = hero; soldPayload.item = item; soldPayload.refund = refund;
+      events.emit('itemSold', soldPayload);
+      return true;
+    }
     for (let i = slot; i < inv.length - 1; i++) inv[i] = inv[i + 1];   // no splice → no alloc
     inv.length--;
     const refund = Math.floor(item.cost * SELL_RATIO);
