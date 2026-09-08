@@ -87,6 +87,7 @@ async function main() {
   await send('Runtime.evaluate', { expression: "if (window.__game) window.__game.paused = true; 'paused'" });
 
   // Run one assertion block: evaluate, print, and fail the run on any `false`.
+  await send('Runtime.evaluate', { expression: "window.__probeEarlyReturn = true;", returnByValue: true });
   const block = async (title, expression) => {
     const r = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
     console.log(`\n=== BEHAVIOR (${title}) ===`);
@@ -339,6 +340,66 @@ async function main() {
     step(1.0);
     r.botRetreatMovesHome = E.pos.z < -0.5;
     return r;
+  })()`);
+
+  // Phase 2 blocks. Each follows SETUP: paused loop, both writers detached, reset,
+  // skipCountdown, hand-driven g.step(dt).
+  await block('status: minion CC and hero root/stealth/attackSpeed/armorBuff/reflect/bonus', `(async () => {
+    try {
+    ${SETUP}
+    const Minion = (await import('/src/units/minion.js')).Minion;
+    const I = H.intent;
+    H.teleport(0, 37); E.teleport(0, -37);
+    // A lone blue minion walks the lane at 3.2 m/s; CC changes that distance in 1 s.
+    // One minion per kind: slow alone (root would mask it), then root, then stun.
+    const spawn = () => W.add(new Minion('blue', W, g.engine.scene, { x: 5, y: 0, z: 20 }, { ranged: false, wave: 0 }));
+    const mn = spawn();
+    step(0.1);
+    const z0 = mn.pos.z;
+    step(1.0);
+    const base = z0 - mn.pos.z;                         // ~3.2 m
+    W.remove(mn); g.step(0.05);
+    const mn2 = spawn();
+    step(0.1);
+    mn2.applyStatus('slow', 10, 0.5);
+    step(1.0);
+    r.minionSlowed = near(mn2.pos.z, z0 - base * 0.5, 0.1);
+    W.remove(mn2); g.step(0.05);
+    const mn3 = spawn();
+    step(0.1);
+    mn3.applyStatus('root', 10, 1);
+    step(1.0);
+    r.minionRooted = near(mn3.pos.z, z0, 1e-6);
+    W.remove(mn3); g.step(0.05);
+    const mn4 = spawn();
+    step(0.1);
+    mn4.applyStatus('stun', 10, 1);
+    step(1.0);
+    r.minionStunned = near(mn4.pos.z, z0, 1e-6);
+    W.remove(mn4); g.step(0.05);
+    // Rooted hero: attacks and casts, does not move, cannot start a dash.
+    H.teleport(0, 0); E.teleport(0, -1.5); fresh(H); fresh(E);
+    H.abilities.applyStatus('root', 5, 1);
+    I.aimX = E.pos.x; I.aimZ = E.pos.z; I.attack = true; I.moveX = 0; I.moveZ = -1;
+    step(0.6);
+    r.heroRootedStillAttacks = E.hp < E.maxHp && near(H.pos.z, 0, 1e-6) && near(H.pos.x, 0, 1e-6);
+    const mp0 = H.mp;
+    I.attack = false; I.moveZ = 0;
+    edge(I, 'e'); step(0.5);
+    r.rootedDashBlocked = H.abilities.dash.active === false && H.cooldowns.e === 0 && near(H.mp, mp0, 1e-6);
+    I.moveX = 0; I.moveZ = 0;
+    // Every status clears on death (abilities.clearStatus through die()).
+    H.abilities.resetAll(); H.abilities.applyStatus('root', 5, 1);
+    H.abilities.applyStatus('stealth', 5, 1); H.abilities.applyStatus('attackSpeed', 5, 0.6);
+    H.abilities.applyStatus('armorBuff', 5, 0.2); H.abilities.applyStatus('reflect', 5, 0.15);
+    H.abilities.applyStatus('bonusNextAuto', 5, 40);
+    H.takeDamage(99999, E, 'true');
+    r.statusClearsOnDeath = H.alive === false && H.abilities.rootTimer === 0
+      && H.abilities.stealthTimer === 0 && H.abilities.atkSpdTimer === 0
+      && H.abilities.armorBuffTimer === 0 && H.abilities.reflectTimer === 0
+      && H.abilities.bonusAutoTimer === 0;
+    return r;
+    } catch (e) { return { error: String((e && e.stack) || e) }; }
   })()`);
 
   ws.close();

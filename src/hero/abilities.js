@@ -23,6 +23,13 @@ export class AbilitySystem {
     this.slowTimer = 0; this.slowPct = 0;
     this.hasteTimer = 0; this.hastePct = 0;
     this.shieldTimer = 0;
+    // Phase 2 status kinds (PHASE2.md §3.5).
+    this.rootTimer = 0;
+    this.stealthTimer = 0;
+    this.atkSpdTimer = 0; this.atkSpdPct = 0;
+    this.armorBuffTimer = 0; this.armorBuffVal = 0;
+    this.reflectTimer = 0; this.reflectVal = 0;
+    this.bonusAutoTimer = 0; this.bonusAutoDmg = 0;
     this._aim = { x: 0, z: 0 };            // wind-up aim scratch
     this.marksEnabled = data.passive.kind === 'mark';
     this.markDuration = this.marksEnabled ? data.passive.duration : 0;
@@ -34,9 +41,16 @@ export class AbilitySystem {
 
   get isCasting() { return this.cast.def !== null || this.dash.active; }
   get stunned() { return this.stunTimer > 0; }
+  get rooted() { return this.rootTimer > 0; }
+  get stealthed() { return this.stealthTimer > 0; }
   get speedMult() {
     return (1 - this.slowPct) * (1 + (this.hasteTimer > 0 ? this.hastePct : 0));
   }
+  // attackSpeed magnitude is a fraction added; interval ÷ (1 + pct) in heroAttack.
+  get attackSpeedPct() { return this.atkSpdTimer > 0 ? this.atkSpdPct : 0; }
+  get armorBuff() { return this.armorBuffTimer > 0 ? this.armorBuffVal : 0; }
+  get reflectPct() { return this.reflectTimer > 0 ? this.reflectVal : 0; }
+  get bonusAuto() { return this.bonusAutoTimer > 0 ? this.bonusAutoDmg : 0; }
 
   unlocked(slot) { return slot !== 'r' || this.hero.level >= R_UNLOCK_LEVEL; }
 
@@ -56,6 +70,7 @@ export class AbilitySystem {
     if (this.state(slot) !== 'ready') return false;
     const hero = this.hero;
     const def = this.data.abilities[slot];
+    if (def.shape === 'dash' && this.rooted) return false;   // rooted: no move, no dash
     hero.mp -= def.cost;
     switch (def.shape) {
       case 'selfAoe':
@@ -124,6 +139,12 @@ export class AbilitySystem {
       this.shieldTimer -= dt;
       if (this.shieldTimer <= EPS || hero.shield <= 0) { this.shieldTimer = 0; hero.shield = 0; }
     }
+    if (this.rootTimer > 0) { this.rootTimer -= dt; if (this.rootTimer <= EPS) this.rootTimer = 0; }
+    if (this.stealthTimer > 0) { this.stealthTimer -= dt; if (this.stealthTimer <= EPS) this.stealthTimer = 0; }
+    if (this.atkSpdTimer > 0) { this.atkSpdTimer -= dt; if (this.atkSpdTimer <= EPS) this.atkSpdTimer = 0; }
+    if (this.armorBuffTimer > 0) { this.armorBuffTimer -= dt; if (this.armorBuffTimer <= EPS) this.armorBuffTimer = 0; }
+    if (this.reflectTimer > 0) { this.reflectTimer -= dt; if (this.reflectTimer <= EPS) this.reflectTimer = 0; }
+    if (this.bonusAutoTimer > 0) { this.bonusAutoTimer -= dt; if (this.bonusAutoTimer <= EPS) this.bonusAutoTimer = 0; }
     this._tickMarks(dt);
 
     if (this.cast.def) {
@@ -159,6 +180,20 @@ export class AbilitySystem {
     } else if (kind === 'shield') {
       this.hero.shield = magnitude;
       this.shieldTimer = seconds;
+    } else if (kind === 'root') {
+      if (seconds > this.rootTimer) this.rootTimer = seconds;
+    } else if (kind === 'stealth') {
+      this.stealthTimer = seconds;
+    } else if (kind === 'attackSpeed') {
+      if (magnitude >= this.atkSpdPct) { this.atkSpdPct = magnitude; this.atkSpdTimer = seconds; }
+    } else if (kind === 'armorBuff') {
+      if (magnitude >= this.armorBuffVal) { this.armorBuffVal = magnitude; this.armorBuffTimer = seconds; }
+    } else if (kind === 'reflect') {
+      this.reflectVal = magnitude;
+      this.reflectTimer = seconds;
+    } else if (kind === 'bonusNextAuto') {
+      this.bonusAutoDmg = magnitude;
+      this.bonusAutoTimer = seconds;
     }
   }
 
@@ -207,6 +242,12 @@ export class AbilitySystem {
     this.slowTimer = 0; this.slowPct = 0;
     this.hasteTimer = 0; this.hastePct = 0;
     this.shieldTimer = 0;
+    this.rootTimer = 0;
+    this.stealthTimer = 0;
+    this.atkSpdTimer = 0; this.atkSpdPct = 0;
+    this.armorBuffTimer = 0; this.armorBuffVal = 0;
+    this.reflectTimer = 0; this.reflectVal = 0;
+    this.bonusAutoTimer = 0; this.bonusAutoDmg = 0;
     this.hero.shield = 0;
     this.cast.def = null; this.cast.timer = 0; this.cast.slot = '';
     this.dash.active = false;

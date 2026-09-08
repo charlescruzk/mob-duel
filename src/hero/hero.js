@@ -159,7 +159,7 @@ export class Hero extends Unit {
   }
 
   _move(dt, intent) {
-    if (this.stunned || this.isCasting || this.isRecalling) return;
+    if (this.stunned || this.abilities.rooted || this.isCasting || this.isRecalling) return;
     const mx = intent.moveX, mz = intent.moveZ;
     if (mx === 0 && mz === 0) return;
     const v = this.moveSpeed * this.abilities.speedMult * dt;
@@ -186,7 +186,8 @@ export class Hero extends Unit {
     events.emit('recallEnded', recallPayload);
   }
 
-  // kind: 'slow' | 'stun' | 'haste' | 'shield'.
+  // kind: 'slow' | 'stun' | 'haste' | 'shield' | 'root' | 'stealth' |
+  //       'attackSpeed' | 'armorBuff' | 'reflect' | 'bonusNextAuto' (PHASE2.md §3.5).
   applyStatus(kind, seconds, magnitude) {
     if (!this.alive) return;
     this.abilities.applyStatus(kind, seconds, magnitude);

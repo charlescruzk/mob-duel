@@ -18,6 +18,7 @@ const DROP = 9.0;
 const AGGRO_PERIOD = 0.5;
 const SHOT_SPEED = 16;         // ranged minion tracer (DESIGN.md §4: projectile 16 m/s)
 const SHOT_Y = 0.9;
+const EPS = 1e-6;
 
 // Priority class of a target (lower wins): minion 0, hero 1, structure 2.
 function priorityOf(u) {
@@ -47,6 +48,11 @@ export class Minion extends Unit {
     this.slotX = pos.x;
     this.wave = wave;
     this.damage = 0;
+    // Crowd control (Phase 2): stun (no move/attack), slow (move × (1−pct)),
+    // root (no move, still attacks). Timers tick in update; cleared on death/reuse.
+    this.stunTimer = 0;
+    this.slowTimer = 0; this.slowPct = 0;
+    this.rootTimer = 0;
     this.mesh = makeMinionMesh(team, ranged);
     if (scene) scene.add(this.mesh);
     shots.attach(scene);
@@ -62,6 +68,7 @@ export class Minion extends Unit {
     this.slotX = pos.x;
     this.target = null;
     this.attackTimer = 0;
+    this._clearStatus();
     // Stagger the aggro tick per minion so a wave does not retarget in lockstep.
     this.aggroTimer = this.world ? this.world.random() * AGGRO_PERIOD : 0;
     this.pos.copy(pos);
@@ -72,11 +79,35 @@ export class Minion extends Unit {
     this.syncMesh();
   }
 
+  // kind: 'stun' | 'slow' | 'root' (PHASE2.md §3.5). Stun/root take the longer
+  // remaining time; slows do not stack — strongest wins, an equal slow extends.
+  applyStatus(kind, seconds, magnitude) {
+    if (kind === 'stun') { if (seconds > this.stunTimer) this.stunTimer = seconds; }
+    else if (kind === 'root') { if (seconds > this.rootTimer) this.rootTimer = seconds; }
+    else if (kind === 'slow') {
+      if (magnitude > this.slowPct) { this.slowPct = magnitude; this.slowTimer = seconds; }
+      else if (magnitude === this.slowPct && seconds > this.slowTimer) this.slowTimer = seconds;
+    }
+  }
+
+  _clearStatus() {
+    this.stunTimer = 0;
+    this.slowTimer = 0; this.slowPct = 0;
+    this.rootTimer = 0;
+  }
+
   update(dt) {
     const world = this.world;
     if (!world) return;
+    if (this.stunTimer > 0) { this.stunTimer -= dt; if (this.stunTimer <= EPS) this.stunTimer = 0; }
+    if (this.slowTimer > 0) {
+      this.slowTimer -= dt;
+      if (this.slowTimer <= EPS) { this.slowTimer = 0; this.slowPct = 0; }
+    }
+    if (this.rootTimer > 0) { this.rootTimer -= dt; if (this.rootTimer <= EPS) this.rootTimer = 0; }
     this.attackTimer -= dt;
     if (this.attackTimer < 0) this.attackTimer = 0;
+    if (this.stunTimer > 0) return;      // stunned: no move, no attack (timers still tick)
 
     let t = this.target;
     if (t && !this._holds(t)) { this.target = null; t = null; }
@@ -97,10 +128,16 @@ export class Minion extends Unit {
         }
         return;
       }
-      this._walkToward(t.pos.x, t.pos.z, dt);
+      if (this.rootTimer <= 0) this._walkToward(t.pos.x, t.pos.z, dt);   // rooted: no move
       return;
     }
+    if (this.rootTimer > 0) return;
     this._walkToward(this.slotX, POSITIONS[enemyOf(this.team)].nexus.z, dt);
+  }
+
+  die(source) {
+    super.die(source);
+    this._clearStatus();
   }
 
   // Keep a target while it is alive, targetable and inside the drop radius.
@@ -149,7 +186,7 @@ export class Minion extends Unit {
     const dz = z - this.pos.z;
     const d = Math.sqrt(dx * dx + dz * dz);
     if (d < 1e-3) return;
-    const step = this.moveSpeed * dt;
+    const step = this.moveSpeed * (1 - this.slowPct) * dt;
     const k = step < d ? step / d : 1;
     this.pos.x += dx * k;
     this.pos.z += dz * k;

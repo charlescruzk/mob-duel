@@ -143,6 +143,31 @@ and a new `fx/` folder (`particles.js`, `abilityFx.js`, `look.js`, `rig.js`,
 `rigAnimator.js`) whose import rule is: fx imports `core/` and `map/` and reads unit
 state; sim code never imports `fx/`.
 
+### Task 1 — status system: minion CC and new hero status kinds
+
+- [x] Minions gain `applyStatus(kind, seconds, magnitude)` for `stun` / `slow` / `root`
+      (PHASE2.md §3.5): stun stops move+attack (timers still tick), slow scales
+      `_walkToward`, root stops movement only. Cleared on death and on pool reuse.
+- [x] Hero abilities gain `root`, `stealth`, `attackSpeed`, `armorBuff`, `reflect`,
+      `bonusNextAuto` with timers in `AbilitySystem.update` and getters
+      (`hero.abilities.rooted` etc.). All cleared by `clearStatus()` on death/respawn
+      and by `resetAll()`.
+- Assumptions (spec silent):
+  - Status getters live on `AbilitySystem`, not `Hero` — `hero.js` was at its ~300-line
+    cap. Consumers read `hero.abilities.rooted` / `.stealthed` / `.attackSpeedPct` /
+    `.armorBuff` / `.reflectPct` / `.bonusAuto`.
+  - Root blocks *starting* a dash (checked in `tryCast` before mana is paid) but does not
+    interrupt a dash already in progress.
+  - `attackSpeed` and `armorBuff` are strongest-wins (re-applying a weaker magnitude
+    leaves the stronger one); an equal magnitude refreshes the timer. Slow stays
+    strongest-wins per §3.5.
+  - `stealth`, `reflect`, `bonusNextAuto` are plain assign (last application wins) —
+    each has exactly one source in the planned kits.
+- Probe: new block `status: minion CC and hero root/stealth/attackSpeed/armorBuff/
+  reflect/bonus` — 6 assertions, **69/69 total** (was 63), exit 0, no code errors.
+- Not verifiable by the probe: whether stealth actually reads as invisible on screen
+  (rendering-side culling arrives with Phase 2 Task 8/9); how root *feels*.
+
 ## Known gaps, deliberately not in the slice
 
 - Multiplayer. `docs/NETCODE.md` is the decision: server-authoritative at 20 Hz, intents
