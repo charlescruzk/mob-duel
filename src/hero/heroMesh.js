@@ -4,6 +4,7 @@
 // Visual offsets live on children; the group itself is placed by Unit.syncMesh().
 import * as THREE from 'three';
 import { RADII, HEIGHTS, TEAM_COLOR } from '../map/laneData.js';
+import { toonMat, addOutline } from '../map/materials.js';
 
 const BODY_R = RADII.hero * 0.84;
 
@@ -12,9 +13,9 @@ const TRIM = { brakk: 0x6b6b6b, ilyra: 0xf2c84b, vaskra: 0x9fd6ff, kesh: 0xb06be
 export function buildHeroMesh(heroKey, team) {
   const color = TEAM_COLOR[team];
   const g = new THREE.Group();
-  const bodyMat = new THREE.MeshLambertMaterial({ color, transparent: true });
-  const trimMat = new THREE.MeshLambertMaterial({ color: TRIM[heroKey] || 0xf2c84b, transparent: true });
-  const noseMat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true });
+  const bodyMat = toonMat(color, true);
+  const trimMat = toonMat(TRIM[heroKey] || 0xf2c84b, true);
+  const noseMat = toonMat(0xffffff, true);
   const mats = [bodyMat, trimMat, noseMat];
 
   const bodyH = HEIGHTS.hero - 2 * BODY_R;
@@ -45,7 +46,7 @@ export function buildHeroMesh(heroKey, team) {
     g.add(cap);
     const bow = new THREE.Mesh(
       new THREE.TorusGeometry(0.5, 0.045, 8, 20, Math.PI),
-      new THREE.MeshLambertMaterial({ color: 0x8a6a44 }));
+      toonMat(0x8a6a44));
     bow.position.set(0.55, HEIGHTS.hero * 0.6, 0);
     bow.rotation.z = Math.PI / 2;
     g.add(bow);
@@ -87,6 +88,15 @@ export function buildHeroMesh(heroKey, team) {
   shield.position.y = HEIGHTS.hero / 2;
   shield.visible = false;
   g.add(shield);
+
+  // Cel outline on the body silhouette. Its material joins `mats` so stealth fades
+  // it together with the body — the outline cannot share the static minion material.
+  const outlineMat = new THREE.MeshBasicMaterial({
+    color: 0x101216, side: THREE.BackSide, transparent: true,
+  });
+  addOutline(body, 1.04, outlineMat);
+  mats.push(outlineMat);
+  g.traverse((o) => { if (o.isMesh && o.name !== 'outline') o.castShadow = true; });
 
   return { group: g, shield, mats };
 }

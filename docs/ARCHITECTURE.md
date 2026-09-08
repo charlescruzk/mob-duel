@@ -24,7 +24,8 @@ src/
                            hero-select overlay picks the matchup, then startMatch wires
                            heroes, structures, economy, bot, HUD and window.__game
   core/
-    engine.js              Engine: renderer/scene/camera/lights/resize/loop      (scaffold)
+    engine.js              Engine: renderer/scene/camera/lights/resize/loop; applies
+                           the Look (fx/look.js) and renders through its composer    (scaffold)
     events.js              EventBus + shared `events`                             (scaffold)
     input.js               Input: keyboard/mouse/pointer lock — the only device reader
     physics.js             distXZ, inRangeXZ, separateCircles, resolveCircleVsBoxes,
@@ -48,7 +49,8 @@ src/
   map/
     laneData.js            every position/radius/bound as data                   (scaffold)
     laneBuilder.js         ground, strip, wall blocks, base markers                (scaffold)
-    textures.js            procedural canvas textures                             (scaffold)
+    textures.js            procedural canvas textures (ground, stone, discs, sky)  (scaffold)
+    materials.js           toon gradient/material + inverted-hull outline helpers  (Task 9)
   units/
     minion.js              class Minion extends Unit (melee + ranged)                UNITS
     waveSpawner.js         WaveSpawner: t=15 s then every 30 s, 3+2 in formation     UNITS

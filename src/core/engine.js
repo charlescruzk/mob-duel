@@ -2,6 +2,7 @@
 // game-specific. `start(cb)` calls cb(dt) every animation frame with dt clamped so a
 // backgrounded tab does not produce a giant step on return.
 import * as THREE from 'three';
+import { Look } from '../fx/look.js';
 
 const MAX_DT = 0.05;
 
@@ -25,6 +26,11 @@ export class Engine {
     this.ambient = new THREE.HemisphereLight(0x8fb4e8, 0x3a2f24, 0.9);
     this.scene.add(this.ambient);
 
+    // Rendering look (shadows, tone mapping, sky, fog, bloom). `?lowfx` strips the
+    // shadow map and the composer — the headless probe always passes it.
+    const lowfx = new URLSearchParams(location.search).has('lowfx');
+    this.look = new Look(this, lowfx);
+
     // Called with the thrown error if the frame callback throws; the loop stops so the
     // page shows one error instead of one per frame.
     this.onError = null;
@@ -45,6 +51,7 @@ export class Engine {
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    if (this.look) this.look.resize(w, h);
   }
 
   start(cb) {
@@ -66,6 +73,7 @@ export class Engine {
     if (dt < 0) dt = 0;
     try {
       this._cb(dt);
+      this.look.preRender();   // shadow frustum follows the player
       this.render();
     } catch (err) {
       this.running = false;
@@ -78,6 +86,6 @@ export class Engine {
   }
 
   render() {
-    this.renderer.render(this.scene, this.camera);
+    this.look.render();
   }
 }

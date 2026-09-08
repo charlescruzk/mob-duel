@@ -16,8 +16,9 @@ export function buildLane(scene) {
   const gd = GROUND_BOUNDS.maxZ - GROUND_BOUNDS.minZ;
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(gw, gd),
-    new THREE.MeshLambertMaterial({ map: makeGroundTexture(gw / 4, gd / 4) }),
+    new THREE.MeshStandardMaterial({ map: makeGroundTexture(gw / 4, gd / 4), roughness: 0.9 }),
   );
+  ground.receiveShadow = true;
   ground.rotation.x = -Math.PI / 2;
   ground.position.set((GROUND_BOUNDS.minX + GROUND_BOUNDS.maxX) / 2, 0, (GROUND_BOUNDS.minZ + GROUND_BOUNDS.maxZ) / 2);
   group.add(ground);
@@ -49,6 +50,8 @@ export function buildLane(scene) {
     const sx = b.max.x - b.min.x, sy = b.max.y - b.min.y, sz = b.max.z - b.min.z;
     const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), stone);
     m.position.set((b.min.x + b.max.x) / 2, sy / 2, (b.min.z + b.max.z) / 2);
+    m.castShadow = true;
+    m.receiveShadow = true;
     group.add(m);
   }
 

@@ -71,6 +71,25 @@ export function makeStoneTexture(repeatX = 2, repeatY = 1) {
   return finish(c, repeatX, repeatY);
 }
 
+// Vertical sky gradient: zenith at the top of the frame, horizon at the bottom.
+// A plain texture background is drawn screen-space, which is exactly a sky band.
+export function makeSkyTexture(zenithHex, horizonHex) {
+  const c = document.createElement('canvas');
+  c.width = 2; c.height = 256;
+  const g = c.getContext('2d');
+  const top = '#' + zenithHex.toString(16).padStart(6, '0');
+  const bot = '#' + horizonHex.toString(16).padStart(6, '0');
+  const grad = g.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0, top);
+  grad.addColorStop(0.72, bot);
+  grad.addColorStop(1, bot);
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 2, 256);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 // Flat tinted disc for fountain zones and base pads.
 export function makeDiscTexture(hex) {
   const size = 128;

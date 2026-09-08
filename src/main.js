@@ -117,6 +117,7 @@ function startMatch(playerKey, enemyKey, base) {
   const hero = new Hero(playerKey, 'blue', world, scene);
   hero.intent = intent;
   world.add(hero);
+  engine.look.follow(hero.pos);   // the shadow frustum tracks the player hero
   camera.snapTo(hero.pos);
   const enemy = new Hero(enemyKey, 'red', world, scene);
   enemy.intent = makeIntent();

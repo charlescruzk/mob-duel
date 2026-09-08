@@ -494,6 +494,54 @@ state; sim code never imports `fx/`.
 - Not verifiable by the probe: whether the bursts read as juicy or as noise; flash and
   kick amplitude at real frame rate; damage-number readability over a busy lane.
 
+### Task 9 — lighting, cel shading, outlines, bloom, sky
+
+- `src/fx/look.js` (new): the whole rendering look in one object. PCF soft shadows,
+  2048² map, ortho sun frustum ±40 m that tracks the player hero each frame (`Look.follow(hero.pos)`
+  holds the pos Vector3 **by reference** — the sim mutates it in place, so respawns and
+  teleports track for free); ACES filmic tone mapping at exposure 1.05 (applies on both
+  paths — `OutputPass` reads the renderer's toneMapping for the composer, the plain
+  path applies it directly); sky gradient `CanvasTexture` (2×256) as screen-space
+  background; fog colour = sky horizon (`0xa8c4de`); cool 0x6a86c8 fill light opposite
+  the sun sharing the sun's moving target; `EffectComposer` → `RenderPass` →
+  `UnrealBloomPass` (0.6 / 0.4 / 0.9) → `OutputPass`; `resize` forwards to the composer.
+- Applied from `engine.js`: the engine constructs `Look` (reading `?lowfx` itself) and
+  calls `look.preRender()` after the step, renders through `look.render()`, forwards
+  resize. **Deviation note:** engine.js (core/) imports fx/look.js — the engine is the
+  render layer, not sim; the "sim never imports fx/" rule is untouched.
+- `src/map/materials.js` (new, map/ so the mesh builders can use it without breaking
+  the fx-import rule): cached 4-step `DataTexture` gradient (RedFormat — MeshToonMaterial
+  samples only the red channel — NearestFilter for hard bands), `toonMat(hex, transparent)`
+  and `addOutline(mesh, scale, mat)` producing the named `outline` BackSide hull.
+- Mesh builders: heroes, minions, towers and nexuses now use `MeshToonMaterial` with the
+  gradient map; one inverted-hull outline each (hero body / minion body / tower body /
+  nexus crystal) at scale 1.04. The hero outline gets its own material pushed into
+  `mats` so stealth fades it with the body. Every unit mesh casts shadows (outline
+  excluded); ground is `MeshStandardMaterial` roughness 0.9 with `receiveShadow`; wall
+  blocks cast and receive.
+- `?lowfx=1` disables the shadow map and the composer (plain `renderer.render` path);
+  nothing else about the sim or the fx layer changes.
+- Assumptions:
+  - The probe's first page now boots with `lowfx=1`: SwiftShader runs the bloom
+    composer at ~5 fps, so the long non-look stretch would have been the probe-timeout
+    suspect. The two look blocks navigate to a full-fx page and back explicitly.
+  - Engine holds the Look rather than main.js wiring it — `engine.render()`/`resize`
+    stay the only render entry points either way.
+  - Sky is a screen-space gradient (top of frame = zenith), not a skybox; with a
+    top-down-ish camera the visible horizon band is small.
+- Probe: new blocks `look: shadows, toon hero, outline, composer renders without error`
+  (6 assertions incl. `renderStillRuns`, which asserts the engine loop is still alive
+  after real rAF time through the composer — a frame error anywhere stops the loop) and
+  `lowfx: shadow map and composer disabled, sim unaffected` (2 assertions).
+  **173/173 assertions true, exit 0, no code errors.** Note: earlier counts (156/164)
+  were line-based `grep -cE ": true"`; three blocks print two assertions per line, so
+  the occurrence-based count is the honest one from now on (this run: 173).
+- One game bug found and fixed during the task: `Look` never stored its `engine`
+  reference — `preRender` threw every frame and killed the loop (caught by
+  `renderStillRuns`, diagnosed with a temp CDP harness).
+- Not verifiable by the probe: whether the cel bands, outline weight, bloom threshold
+  and ACES exposure actually read well at real frame rate (see Needs a human).
+
 ## Known gaps, deliberately not in the slice
 
 - Multiplayer. `docs/NETCODE.md` is the decision: server-authoritative at 20 Hz, intents

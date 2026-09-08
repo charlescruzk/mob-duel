@@ -4,6 +4,7 @@
 // offsets live on children, so Unit.syncMesh can drive the group directly.
 import * as THREE from 'three';
 import { TEAM_COLOR, RADII, HEIGHTS } from '../map/laneData.js';
+import { toonMat, addOutline } from '../map/materials.js';
 
 const SQRT2 = Math.SQRT2;
 
@@ -25,19 +26,19 @@ const geo = {
 const bodyMats = {};
 const glowMats = {};
 const shotMats = {};
-const noseMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
-const plinthMat = new THREE.MeshLambertMaterial({ color: 0x6b6b66 });
+const noseMat = toonMat(0x1a1a1a);
+const plinthMat = toonMat(0x6b6b66);
 
 function bodyMat(team) {
-  if (!bodyMats[team]) bodyMats[team] = new THREE.MeshLambertMaterial({ color: TEAM_COLOR[team] });
+  if (!bodyMats[team]) bodyMats[team] = toonMat(TEAM_COLOR[team]);
   return bodyMats[team];
 }
 
 function glowMat(team) {
   if (!glowMats[team]) {
-    glowMats[team] = new THREE.MeshLambertMaterial({
-      color: TEAM_COLOR[team], emissive: TEAM_COLOR[team], emissiveIntensity: 0.9,
-    });
+    glowMats[team] = toonMat(TEAM_COLOR[team]);
+    glowMats[team].emissive.setHex(TEAM_COLOR[team]);
+    glowMats[team].emissiveIntensity = 0.9;
   }
   return glowMats[team];
 }
@@ -63,6 +64,8 @@ export function makeMinionMesh(team, ranged) {
   const nose = new THREE.Mesh(geo.nose, noseMat);
   nose.position.set(0, bodyH * 0.75, -(ranged ? 0.225 : 0.25) - 0.1);
   g.add(nose);
+  addOutline(body, 1.04);
+  g.traverse((o) => { if (o.isMesh && o.name !== 'outline') o.castShadow = true; });
   return g;
 }
 
@@ -78,6 +81,8 @@ export function makeTowerMesh(team) {
   const top = new THREE.Mesh(geo.towerTop, glowMat(team));
   top.position.y = HEIGHTS.tower + 0.5;
   g.add(top);
+  addOutline(body, 1.04);
+  g.traverse((o) => { if (o.isMesh && o.name !== 'outline') o.castShadow = true; });
   return g;
 }
 
@@ -90,6 +95,8 @@ export function makeNexusMesh(team) {
   crystal.position.y = 0.6 + 1.5 * 1.3;
   crystal.scale.set(1, 1.3, 1);
   g.add(crystal);
+  addOutline(crystal, 1.04);
+  g.traverse((o) => { if (o.isMesh && o.name !== 'outline') o.castShadow = true; });
   return g;
 }
 

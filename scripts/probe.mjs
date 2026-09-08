@@ -18,8 +18,10 @@ const PORT = 8090;
 const CDP = 9343;
 const URL_BASE = `http://127.0.0.1:${PORT}/index.html`;
 // The first load runs a normal match (?hero=brakk); the hero-select block navigates
-// to the bare page, where the match is only built once a card is clicked.
-const URL = `${URL_BASE}?cb=${Date.now()}&hero=brakk&enemy=ilyra`;
+// to the bare page, where the match is only built once a card is clicked. lowfx
+// keeps SwiftShader off the bloom composer for the long non-look stretch — the
+// look blocks below navigate to a full-fx page explicitly.
+const URL = `${URL_BASE}?cb=${Date.now()}&hero=brakk&enemy=ilyra&lowfx=1`;
 
 let exitCode = 0;
 
@@ -1178,6 +1180,53 @@ async function main() {
     const aliveBefore = P.alive();
     m.reset();
     r.fxResetsOnMatchReset = aliveBefore > 0 && P.alive() === 0;
+    return r;
+    } catch (e) { return { error: String((e && e.stack) || e) }; }
+  })()`);
+
+  // Task 9: the rendering look. The rest of the run uses lowfx (SwiftShader is too
+  // slow with the bloom composer); these two blocks load the full-fx and cheap paths
+  // explicitly. A frame error anywhere stops the engine loop, so "still running"
+  // after real rAF time is the render-still-works proof.
+  await restart('hero=brakk&enemy=ilyra');
+  await block('look: shadows, toon hero, outline, composer renders without error', `(async () => {
+    try {
+    const g = window.__game;
+    const L = g.engine.look;
+    const r = {};
+    r.shadowsEnabledByDefault = !!L && L.lowfx === false
+      && g.engine.renderer.shadowMap.enabled === true && L.composer !== null;
+    let toon = false, outline = false, casts = false;
+    g.hero.mesh.traverse((o) => {
+      if (!o.isMesh) return;
+      if (o.material && o.material.isMeshToonMaterial && o.material.gradientMap) toon = true;
+      if (o.name === 'outline') outline = true;
+      if (o.castShadow) casts = true;
+    });
+    r.heroUsesToonMaterial = toon;
+    r.outlineMeshPresent = outline;
+    r.heroCastsShadow = casts;
+    // Simulate a second by hand, then let real rAF frames render through the
+    // composer: the engine loop must still be alive afterwards.
+    for (let k = 0; k < 20; k++) g.step(0.05);
+    const f0 = g.engine.frame;
+    await new Promise((res) => setTimeout(res, 400));
+    r.renderStillRuns = g.engine.running === true && g.engine.frame > f0;
+    return r;
+    } catch (e) { return { error: String((e && e.stack) || e) }; }
+  })()`);
+
+  await restart('hero=brakk&lowfx=1');
+  await block('lowfx: shadow map and composer disabled, sim unaffected', `(async () => {
+    try {
+    const g = window.__game;
+    const L = g.engine.look;
+    const r = {};
+    r.lowfxDisablesComposer = L.lowfx === true && L.composer === null
+      && g.engine.renderer.shadowMap.enabled === false;
+    // The cheap path still renders (straight renderer.render) and simulates.
+    for (let k = 0; k < 20; k++) g.step(0.05);
+    r.lowfxStillSimulates = g.hero.alive && g.world.units.length > 0;
     return r;
     } catch (e) { return { error: String((e && e.stack) || e) }; }
   })()`);
