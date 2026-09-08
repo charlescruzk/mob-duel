@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>moba-duel</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; overflow: hidden;
+                 font-family: system-ui, -apple-system, Segoe UI, sans-serif; color: #fff;
+                 user-select: none; }
+    #game-canvas { display: block; width: 100vw; height: 100vh; }
+
+    /* --- start gate --- */
+    #start-overlay { position: fixed; inset: 0; display: flex; flex-direction: column;
+                     align-items: center; justify-content: center; gap: 14px; cursor: pointer;
+                     text-align: center; z-index: 10;
+                     background: radial-gradient(ellipse at center, rgba(8,10,14,.72) 0%, rgba(4,5,8,.94) 100%); }
+    #start-overlay.hidden { display: none; }
+    #start-overlay .game-name { font: 700 56px/1 monospace; letter-spacing: .16em; color: #e8e6e0; }
+    #start-overlay .game-name span { color: #3b6fd6; }
+    #start-overlay .tag { font: 12px/1.5 monospace; letter-spacing: .1em; color: #8f8d86;
+                          text-transform: uppercase; }
+    #start-overlay .ctl { margin-top: 18px; max-width: 640px; font: 12px/1.9 monospace;
+                          color: #a8a59c; }
+    #start-overlay .ctl b { color: #e8e6e0; }
+    #start-overlay .hint { margin-top: 10px; font: 11px/1.4 monospace; color: #6c6a64;
+                           letter-spacing: .1em; }
+
+    /* --- HUD --- */
+    #hud { position: fixed; inset: 0; pointer-events: none; }
+    #hud > * { position: absolute; }
+    #reticle { left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px;
+               border: 2px solid rgba(255,255,255,.85); border-radius: 50%;
+               box-shadow: 0 0 2px #000, inset 0 0 2px #000; }
+    #match-timer { top: 12px; left: 50%; transform: translateX(-50%);
+                   font: 700 22px/1 monospace; letter-spacing: .04em; text-shadow: 0 0 4px #000; }
+    #status { left: 20px; bottom: 96px; font: 13px/1.5 monospace; }
+    #status .row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+    #status .lbl { width: 28px; font-size: 11px; letter-spacing: .08em; opacity: .8; }
+    #status .bar { width: 240px; height: 10px; background: rgba(255,255,255,.15); position: relative; }
+    #status .bar > i { display: block; height: 100%; width: 100%; transform-origin: left center; }
+    #hp-bar { background: #34d15b; }
+    #mp-bar { background: #4a8fe8; }
+    #status .num { min-width: 90px; text-align: right; text-shadow: 0 0 3px #000; }
+    #level-badge { left: 20px; bottom: 150px; font: 700 14px/1 monospace; letter-spacing: .1em;
+                   text-shadow: 0 0 3px #000; }
+    #gold { right: 20px; bottom: 96px; font: 700 20px/1 monospace; color: #f2c84b;
+            text-shadow: 0 0 4px #000; }
+    #respawn-timer { top: 40%; left: 50%; transform: translateX(-50%); display: none;
+                     font: 700 32px/1 monospace; color: #ff6b6b; text-shadow: 0 0 6px #000; }
+    /* Countdown / FIGHT / winner line, written by src/game/match.js. */
+    #match-banner { top: 28%; left: 50%; transform: translateX(-50%); display: none;
+                    font: 700 40px/1.2 monospace; letter-spacing: .12em; text-align: center;
+                    white-space: nowrap; color: #e8e6e0; text-shadow: 0 0 12px #000, 0 0 2px #000; }
+    /* Reserved roots: filled by src/hud/abilityBar.js and src/hud/shopPanel.js. */
+    #ability-bar { left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; gap: 8px; }
+    #shop { right: 20px; top: 60px; display: none; pointer-events: auto; }
+
+    #boot-status { position: fixed; left: 12px; top: 12px; font: 12px/1.4 monospace;
+                   color: #9f9; opacity: .8; z-index: 20; }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+
+  <div id="hud">
+    <div id="reticle"></div>
+    <div id="match-timer">0:00</div>
+    <div id="level-badge">LV 1</div>
+    <div id="status">
+      <div class="row"><span class="lbl">HP</span><span class="bar"><i id="hp-bar"></i></span><span class="num" id="hp-num">0 / 0</span></div>
+      <div class="row"><span class="lbl">MP</span><span class="bar"><i id="mp-bar"></i></span><span class="num" id="mp-num">0 / 0</span></div>
+    </div>
+    <div id="gold">0 g</div>
+    <div id="respawn-timer"></div>
+    <div id="match-banner"></div>
+    <div id="ability-bar"></div>
+    <div id="shop"></div>
+  </div>
+
+  <div id="start-overlay">
+    <div class="game-name">MOBA<span>·</span>DUEL</div>
+    <div class="tag">1v1 duel lane — vertical slice</div>
+    <div class="ctl">
+      <b>WASD</b> move &nbsp;·&nbsp; <b>Mouse</b> look/aim &nbsp;·&nbsp; <b>LMB / Space</b> attack<br>
+      <b>Q F E R</b> abilities (F casts W) &nbsp;·&nbsp; <b>B</b> recall &nbsp;·&nbsp; <b>P</b> shop / <b>1–4</b> buy (in fountain)<br>
+      Destroy their tower, then their nexus. &nbsp;·&nbsp; After a result: <b>click</b> or <b>Enter</b> for a rematch.
+    </div>
+    <div class="hint">CLICK TO PLAY</div>
+  </div>
+
+  <div id="boot-status">booting…</div>
+  <script>
+    // Surface any load-time or runtime failure on screen so "nothing happens" is
+    // never silent. A plain (non-module) script loads synchronously, so it is armed
+    // before main.js — it catches even a failed module load / CDN miss.
+    (() => {
+      const el = document.getElementById('boot-status');
+      const show = (msg) => {
+        if (!el) return;
+        el.textContent = msg;
+        el.style.color = '#ff6b6b';
+        el.style.whiteSpace = 'pre-wrap';
+        el.style.maxWidth = '70vw';
+        el.style.maxHeight = '60vh';
+        el.style.overflow = 'auto';
+      };
+      window.addEventListener('error', (e) => {
+        const src = e.filename ? `${e.filename}:${e.lineno}` : '';
+        show('JS ERROR: ' + (e.message || (e.error && e.error.message) || 'unknown') +
+             (src ? '\n@ ' + src : ''));
+      });
+      window.addEventListener('unhandledrejection', (e) => {
+        const r = e.reason;
+        show('UNHANDLED REJECTION: ' + (r && r.message ? r.message : r));
+      });
+      window.addEventListener('load', () => setTimeout(() => {
+        if (!window.__game) {
+          show('BOOT INCOMPLETE — main.js did not finish.\n' +
+               'If opened via file://, module scripts are blocked by the browser; serve it ' +
+               'over http (npm run serve → http://127.0.0.1:8090). Otherwise the three.js ' +
+               'import may have failed to load from the CDN.');
+        }
+      }, 1500));
+    })();
+  </script>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
