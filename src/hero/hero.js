@@ -51,6 +51,7 @@ export class Hero extends Unit {
     this.swTimer = 0; this.swCd = 0;
     this.potionHpRate = 0; this.potionHpTimer = 0;      // consumable HoTs (consumables.js ticks)
     this.potionMpRate = 0; this.potionMpTimer = 0;
+    this.headhunterCount = 0; this.headhunterTarget = null;   // Headhunter passive (heroAttack)
     this.goldValue = HERO_KILL_GOLD;
     this.respawnTimer = 0;
     this.isRecalling = false; this.recallTimer = 0;
@@ -226,6 +227,7 @@ export class Hero extends Unit {
     this.respawnTimer = respawnTime(this.level);
     this.cancelRecall();
     this.potionHpRate = this.potionHpTimer = this.potionMpRate = this.potionMpTimer = 0;
+    this.headhunterCount = 0; this.headhunterTarget = null;
     this.abilities.clearStatus();
     this.attack.reset();
     if (this.shieldMesh) this.shieldMesh.visible = false;
@@ -296,6 +298,7 @@ export class Hero extends Unit {
     for (let k = 0; k < ITEM_KEYS.length; k++) s[ITEM_KEYS[k]] = 0;
     this.passives.length = 0;
     this.potionHpRate = this.potionHpTimer = this.potionMpRate = this.potionMpTimer = 0;
+    this.headhunterCount = 0; this.headhunterTarget = null;
     this.abilities.resetAll();
     this.attack.reset();
     this.isRecalling = false; this.recallTimer = 0;

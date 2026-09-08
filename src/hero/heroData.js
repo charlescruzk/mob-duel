@@ -123,10 +123,65 @@ export const HEROES = {
       },
     },
   },
+
+  vaskra: {
+    key: 'vaskra',
+    name: 'Vaskra',
+    title: 'the Longshot',
+    role: 'ranged marksman',
+    primary: 'agi',
+    ranged: true,
+    hp: { base: 480, step: 60 },
+    mp: { base: 260, step: 25 },
+    hpRegen: { base: 1.0, step: 0.1 },
+    mpRegen: { base: 1.2, step: 0.12 },
+    moveSpeed: 5.1,
+    attackRange: 8.0,
+    attackDamage: { base: 55, step: 5 },
+    attackInterval: 0.85,
+    windup: 0.2,
+    projectileSpeed: 26.0,
+    armor: { base: 0.08, step: 0.01 },
+    passive: {
+      key: 'p', name: 'Headhunter', kind: 'headhunter',
+      desc: 'Every third consecutive basic attack on the same target deals 15 + 5/level true damage.',
+      bonus: { base: 15, step: 5 },
+    },
+    abilities: {
+      q: {
+        slot: 'q', name: 'Piercing Shot', cost: 40, cd: 7.0, range: 14.0, shape: 'skillshot',
+        radius: 0.5, speed: 28.0, pierce: true, dtype: 'physical',
+        damage: { base: 65, step: 18 },
+        desc: 'Line skillshot, 14 m, pierces every enemy on the way. Physical.',
+      },
+      w: {
+        slot: 'w', name: 'Quickdraw', cost: 45, cd: 12.0, range: 0, shape: 'buff',
+        buffKind: 'attackSpeed', buffPct: 0.60, buffTime: 4.0,
+        autoSlowPct: 0.15, autoSlowTime: 1.0,
+        desc: '4 s: +60% attack speed; basic attacks slow 15% for 1 s.',
+      },
+      e: {
+        slot: 'e', name: 'Tumble', cost: 35, cd: 9.0, range: 3.5, shape: 'dash',
+        minDist: 3.5, maxDist: 3.5, speed: 16.0, noDamage: true,
+        bonusAuto: { base: 30, step: 8 }, bonusAutoTime: 3.0,
+        desc: 'Hop 3.5 m toward the reticle. The next basic attack within 3 s deals 30 + 8/level bonus.',
+      },
+      r: {
+        slot: 'r', name: 'Deadeye', cost: 100, cd: 70.0, range: 30.0, shape: 'windup',
+        windup: 1.0, resolve: 'skillshot', radius: 0.6, speed: 45.0, pierce: false,
+        heroesOnly: true, execScale: true,
+        damage: { base: 150, step: 40 },
+        desc: '1.0 s aim (interrupted by stun), then a 30 m bolt at the first hero hit, '
+          + 'scaled by its missing HP (cap x2).',
+      },
+    },
+  },
 };
 
-export const HERO_KEYS = ['brakk', 'ilyra'];
+export const HERO_KEYS = ['brakk', 'ilyra', 'vaskra'];
 
+// Brakk ↔ Ilyra for the original pairing; every other hero bot-fills as Brakk until
+// hero select (Task 7) wires ?enemy=.
 export function otherHero(key) { return key === 'brakk' ? 'ilyra' : 'brakk'; }
 
 // base + step × (L − 1) for a { base, step } pair; plain numbers pass through.

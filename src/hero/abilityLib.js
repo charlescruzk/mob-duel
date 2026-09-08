@@ -41,10 +41,11 @@ export function applyStatusTo(unit, kind, seconds, magnitude) {
 
 // One ability damage instance. Returns HP dealt. Marks the target for Ilyra's
 // passive; Null Veil's spell shield eats the hit; Flow/Rend resolve afterwards.
-export function abilityHit(hero, sys, unit, raw) {
+// dtype: 'magic' unless the ability says physical (Vaskra Q).
+export function abilityHit(hero, sys, unit, raw, dtype) {
   if (!unit.alive || unit.invulnerable || unit.kind === 'tower' || unit.kind === 'nexus') return 0;
   if (passives.blockedBySpellShield(hero, unit)) return 0;
-  const dealt = unit.takeDamage(raw, hero, 'magic');
+  const dealt = unit.takeDamage(raw, hero, dtype || 'magic');
   passives.onAbilityHit(hero, unit, dealt);
   if (sys.marksEnabled && unit.alive) sys.markUnit(unit);
   return dealt;
@@ -133,6 +134,13 @@ export function stepDash(hero, sys, world, dt) {
   }
   if (!stop) return false;
   ds.active = false;
+  if (ds.def.noDamage) {
+    // Hop abilities (Tumble): no landing damage; arm the next-auto bonus instead.
+    if (ds.def.bonusAuto) {
+      sys.applyStatus('bonusNextAuto', ds.def.bonusAutoTime, atLevel(ds.def.bonusAuto, hero.level));
+    }
+    return true;
+  }
   aoeDamage(hero, sys, ds.def, hero.pos.x, hero.pos.z);
   return true;
 }
@@ -151,9 +159,11 @@ export function castSkillshot(hero, sys, def, aimX, aimZ) {
   if (!p) return false;
   p.owner = hero;
   p.pierce = !!def.pierce;
+  p.heroesOnly = !!def.heroesOnly;
+  p.execScale = !!def.execScale;
   p.slot = def.slot;
   p.damage = scaledDamage(hero, def);
-  p.dtype = 'magic';
+  p.dtype = def.dtype || 'magic';
   return true;
 }
 

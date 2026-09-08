@@ -3,6 +3,7 @@
 // and Ilyra's marks. Data-driven from heroData; the resolvers live in abilityLib.
 import { SLOTS, R_UNLOCK_LEVEL } from './heroData.js';
 import * as lib from './abilityLib.js';
+import * as ext from './abilityLibExt.js';
 
 const MARK_POOL = 32;
 const EPS = 1e-6;          // countdowns snap to 0 so float drift never costs a frame
@@ -30,13 +31,15 @@ export class AbilitySystem {
     this.armorBuffTimer = 0; this.armorBuffVal = 0;
     this.reflectTimer = 0; this.reflectVal = 0;
     this.bonusAutoTimer = 0; this.bonusAutoDmg = 0;
+    // Auto-applied slow window (Quickdraw W): while up, basic attacks slow the target.
+    this.autoSlowTimer = 0; this.autoSlowPct = 0; this.autoSlowTime = 0;
     this._aim = { x: 0, z: 0 };            // wind-up aim scratch
     this.marksEnabled = data.passive.kind === 'mark';
     this.markDuration = this.marksEnabled ? data.passive.duration : 0;
     this.marks = [];
     for (let i = 0; i < MARK_POOL; i++) this.marks.push({ unit: null, t: 0 });
     // Bound once: projectiles carry this instead of a per-cast closure.
-    this.onProjectileHit = (p, u) => lib.abilityHit(this.hero, this, u, p.damage);
+    this.onProjectileHit = (p, u) => ext.projectileHit(this.hero, this, p, u);
   }
 
   get isCasting() { return this.cast.def !== null || this.dash.active; }
@@ -83,6 +86,10 @@ export class AbilitySystem {
         break;
       case 'dash':
         lib.startDash(hero, this, def, aimX, aimZ);     // cooldown starts on landing
+        break;
+      case 'buff':
+        ext.castBuff(hero, this, def);
+        this.startCooldown(slot);
         break;
       case 'windup':
         this.cast.slot = slot;
@@ -148,16 +155,25 @@ export class AbilitySystem {
     }
     if (this.reflectTimer > 0) { this.reflectTimer -= dt; if (this.reflectTimer <= EPS) this.reflectTimer = 0; }
     if (this.bonusAutoTimer > 0) { this.bonusAutoTimer -= dt; if (this.bonusAutoTimer <= EPS) this.bonusAutoTimer = 0; }
+    if (this.autoSlowTimer > 0) { this.autoSlowTimer -= dt; if (this.autoSlowTimer <= EPS) this.autoSlowTimer = 0; }
     this._tickMarks(dt);
 
     if (this.cast.def) {
-      this.cast.timer -= dt;
-      if (this.cast.timer <= EPS) {
-        const def = this.cast.def;
+      if (hero.stunned) {
+        // Stun interrupts any wind-up mid-cast (Deadeye, Sunder Slam): no resolve,
+        // no cooldown — the mana is already spent.
         this.cast.def = null;
         this.cast.timer = 0;
-        lib.resolveWindup(hero, this, def, aimX, aimZ);
-        this.startCooldown(def.slot);
+        this.cast.slot = '';
+      } else {
+        this.cast.timer -= dt;
+        if (this.cast.timer <= EPS) {
+          const def = this.cast.def;
+          this.cast.def = null;
+          this.cast.timer = 0;
+          lib.resolveWindup(hero, this, def, aimX, aimZ);
+          this.startCooldown(def.slot);
+        }
       }
     }
     if (this.dash.active && lib.stepDash(hero, this, world, dt)) this.startCooldown('e');
@@ -251,6 +267,7 @@ export class AbilitySystem {
     this.armorBuffTimer = 0; this.armorBuffVal = 0;
     this.reflectTimer = 0; this.reflectVal = 0;
     this.bonusAutoTimer = 0; this.bonusAutoDmg = 0;
+    this.autoSlowTimer = 0; this.autoSlowPct = 0; this.autoSlowTime = 0;
     this.hero.refreshArmor();
     this.hero.shield = 0;
     this.cast.def = null; this.cast.timer = 0; this.cast.slot = '';

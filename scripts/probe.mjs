@@ -118,6 +118,16 @@ async function main() {
   console.log(state?.result?.value ?? '(eval failed)');
   if (!state?.result?.value?.includes('"hasGame":true')) exitCode = 1;
 
+  // Fresh page for hero-specific blocks (the first load runs the default Brakk page):
+  // navigate with new query params, click through the start gate, pause the clock.
+  const restart = async (qs) => {
+    await send('Page.navigate', { url: `${URL}&${qs}` });
+    await sleep(4500);
+    await send('Runtime.evaluate', { expression: "const o=document.querySelector('#start-overlay'); if(o) o.click(); 'clicked'" });
+    await sleep(1200);
+    await send('Runtime.evaluate', { expression: "if (window.__game) window.__game.paused = true; 'paused'" });
+  };
+
   // ---------------------------------------------------------------------------
   // ASSERTION BLOCKS — add one `await block(title, expression)` per feature below.
   // Each expression is an async IIFE returning an object of booleans. Drive the
@@ -598,6 +608,87 @@ async function main() {
     // The panel shows 25 items across four tabs.
     r.panelTabsAndItems = document.querySelectorAll('#shop .sp-tab').length === 4
       && document.querySelectorAll('#shop .sp-item').length === 25;
+    return r;
+    } catch (e) { return { error: String((e && e.stack) || e) }; }
+  })()`);
+
+  // --- Vaskra (task 3) — fresh page with ?hero=vaskra (enemy fills as Brakk) ---
+  await restart('hero=vaskra&lowfx=1');
+
+  await block('vaskra: pierce, quickdraw, tumble, headhunter, deadeye', `(async () => {
+    try {
+    ${SETUP}
+    const I = H.intent;
+    const Minion = (await import('/src/units/minion.js')).Minion;
+    const spawn = (x, z) => {
+      const mn = W.add(new Minion('red', W, g.engine.scene, { x: x, y: 0, z: z }, { ranged: false, wave: 0 }));
+      mn.applyStatus('root', 30, 1);
+      return mn;
+    };
+    // Mid-lane, away from towers/fountain. fresh() zeroes regen-drift by restoring hp.
+    H.teleport(0, 0); E.teleport(0, 6); fresh(H); fresh(E);
+
+    // Q pierces: two rooted minions on the aim line both take the hit.
+    const mnA = spawn(0, -5), mnB = spawn(0, -9);
+    I.aimX = 0; I.aimZ = -20;
+    edge(I, 'q'); step(0.5);
+    r.vaskraQPierces = mnA.hp < mnA.maxHp && mnB.hp < mnB.maxHp;
+    fresh(H);
+
+    // W arms the attack-speed buff (and the auto-slow window).
+    edge(I, 'w'); step(0.05);
+    r.vaskraWRaisesAttackSpeed = H.abilities.attackSpeedPct === 0.6
+      && H.abilities.atkSpdTimer > 3 && H.abilities.autoSlowTimer > 3;
+    fresh(H);
+
+    // E is a no-damage hop: lands 3.5 m on, the minion in the way is untouched.
+    // Tolerance is loose: landing on the minion triggers unit separation, nudging H.
+    const mnC = spawn(0, -3.5);
+    I.aimX = 0; I.aimZ = -10;
+    edge(I, 'e'); step(0.4);
+    r.vaskraEHopsNoDamage = near(H.pos.z, -3.5, 0.5) && mnC.hp === mnC.maxHp
+      && H.abilities.bonusAutoTimer > 0;
+    // The armed bonus lands on the next auto: (55 + 30) AD × (1 − 0.15 armor);
+    // bonusAuto 30 + 8/level resolves to the base at level 1.
+    E.teleport(0, 1);
+    const ehp0 = E.hp;
+    I.aimX = E.pos.x; I.aimZ = E.pos.z; I.attack = true;
+    step(0.6); I.attack = false;    // windup 0.2 + flight ~0.16: land must be inside the window
+    r.vaskraEBonusAuto = near(ehp0 - E.hp, (55 + 30) * 0.85, 1.5)
+      && H.abilities.bonusAutoTimer === 0;
+    fresh(H);
+
+    // Headhunter: three autos on the same minion — the third carries +15 true
+    // (15 + 5/level resolves to the base at level 1).
+    const mnD = spawn(0, -4);
+    I.aimX = 0; I.aimZ = -4; I.attack = true;
+    let lands = 0;
+    for (let k = 0; k < 60 && lands < 3; k++) {
+      const before = mnD.hp;
+      g.step(0.05);
+      if (mnD.hp < before) lands++;
+    }
+    I.attack = false;
+    r.vaskraHeadhunterThirdHit = lands === 3 && near(mnD.maxHp - mnD.hp, 55 + 55 + 70, 1)
+      && H.headhunterCount === 0;
+    fresh(H);
+
+    // Deadeye exec-scale at level 4: raw 150 + 40·3 = 270, ×1.5 on a 50 % HP target,
+    // mitigated by 0.15 armor. maxHp is inflated so the hit cannot kill.
+    H.level = 4; fresh(H);
+    E.hpRegen = 0; E.maxHp = 2000; E.hp = 1000;
+    const ehp1 = E.hp;
+    I.aimX = E.pos.x; I.aimZ = E.pos.z;
+    edge(I, 'r'); step(1.2);
+    r.vaskraRExecScales = near(ehp1 - E.hp, 270 * 1.5 * 0.85, 2);
+    // Stun mid-wind-up cancels Deadeye: no resolve, no cooldown.
+    H.abilities.resetAll(); fresh(H); E.hp = E.maxHp;
+    const ehp2 = E.hp;
+    edge(I, 'r'); step(0.3);
+    H.abilities.applyStatus('stun', 2, 1);
+    step(1.0);
+    r.vaskraRInterruptedByStun = near(E.hp, ehp2, 0.5)
+      && H.abilities.cast.def === null && H.abilities.cooldowns.r === 0;
     return r;
     } catch (e) { return { error: String((e && e.stack) || e) }; }
   })()`);

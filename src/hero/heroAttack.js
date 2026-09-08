@@ -5,6 +5,7 @@
 import { TEAM_COLOR } from '../map/laneData.js';
 import { atLevel } from './heroData.js';
 import * as passives from '../economy/passives.js';
+import * as lib from './abilityLib.js';
 import { effects } from './effects.js';
 
 const RANGE_LENIENCY = 0.75;      // target may drift this far out of range during the wind-up
@@ -120,6 +121,19 @@ export class BasicAttack {
     if (passive.kind === 'lifeOnHit' && hero.alive) {
       const heal = atLevel(passive.heal, hero.level) * (u.kind === 'hero' ? passive.heroMult : 1);
       hero.heal(heal);
+    }
+    if (passive.kind === 'headhunter' && u.alive) {
+      // Every third consecutive hit on the same target: bonus true damage; changing
+      // targets resets the count (heroAttack owns it because land() sees the target).
+      if (hero.headhunterTarget !== u) { hero.headhunterTarget = u; hero.headhunterCount = 0; }
+      hero.headhunterCount++;
+      if (hero.headhunterCount >= 3) {
+        hero.headhunterCount = 0;
+        u.takeDamage(atLevel(passive.bonus, hero.level), hero, 'true');
+      }
+    }
+    if (sys.autoSlowTimer > 0 && u.alive) {
+      lib.applyStatusTo(u, 'slow', sys.autoSlowTime, sys.autoSlowPct);
     }
     return dealt;
   }

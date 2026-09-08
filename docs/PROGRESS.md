@@ -210,6 +210,43 @@ state; sim code never imports `fx/`.
 - Not verifiable by the probe: shop tab feel and click targets; whether burn DoT and
   damage numbers (Task 8) read clearly; item power feel (Task 11 balance pass).
 
+### Task 3 — Vaskra the Longshot
+
+- [x] Roster entry in `heroData.js` (`?hero=vaskra`): agi marksman, 480+60 hp,
+      260+25 mp, 8 m range, 0.85 s attack, 55+5 AD, projectileSpeed 26.
+- [x] Passive **Headhunter** (`heroAttack.land`): every third consecutive basic attack
+      on the same target deals 15 + 5/level true damage; switching targets resets the
+      count; count/target cleared on death, respawn, and `reset()`.
+- [x] Q **Piercing Shot**: skillshot 14 m, pierces every enemy, *physical* dtype —
+      `dtype` threads through `castSkillshot` → projectile → `abilityHit` (default magic).
+- [x] W **Quickdraw**: `buff` shape (`abilityLibExt.castBuff`) — attackSpeed status
+      +60 % for 4 s, plus autos slow 15 % for 1 s while it runs (`autoSlow*` fields
+      applied from `heroAttack.land`, cleared in `clearStatus`).
+- [x] E **Tumble**: dash with `noDamage: true` in `stepDash` — arms `bonusNextAuto`
+      (30 + 8/level, 3 s), no damage, no slow.
+- [x] R **Deadeye**: 1.0 s wind-up (`windup` shape, resolve `skillshot`) interrupted by
+      stun with no resolve and no cooldown (generic in `abilities.update` — Brakk R
+      behaves the same); projectile `heroesOnly` (skips minions in `effects._sweep`)
+      with `execScale` — damage recomputed at impact from target missing-HP fraction
+      ×(1 + missing), capped ×2 (`abilityLibExt.projectileHit`).
+- [x] Mesh trim (`heroMesh.js`): scout cap + torus-segment bow, trim 0x9fd6ff.
+- Assumptions (spec silent):
+  - `castBuff` arms the auto-slow on the caster with the buff's own duration — a
+    single status covers both halves of the ability.
+  - Exec-scale reads the target's HP at *impact*, so heals during the 1 s aim reduce
+    the bonus; cap ×2 matches the desc.
+  - Stun interrupts *any* wind-up cast (not just Deadeye) — cheapest consistent rule;
+    the cast is fully cancelled (no damage, no cooldown).
+  - `HERO_KEYS` gains vaskra; `otherHero` still pairs Brakk↔Ilyra for bots until
+    Task 7 wires `?enemy=`.
+  - Scaling convention: "15 + 5/level" and "30 + 8/level" resolve to the *base* at
+    level 1 (same as every other `{base, step}` stat) — probe asserts confirm.
+- Probe: new block `vaskra: pierce, quickdraw, tumble, headhunter, deadeye` via the
+  new `restart('hero=vaskra&lowfx=1')` helper (hero-specific pages mid-probe) —
+  7 assertions, **106/106 total** (was 99), exit 0, no code errors.
+- Not verifiable by the probe: bow/cap readability on screen; whether the 1 s Deadeye
+  aim telegraph reads; marksman kiting feel.
+
 ## Known gaps, deliberately not in the slice
 
 - Multiplayer. `docs/NETCODE.md` is the decision: server-authoritative at 20 Hz, intents

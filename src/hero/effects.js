@@ -24,6 +24,8 @@ class Projectile {
     this.owner = null;          // free-form: the caller's unit
     this.target = null;         // homing when set; cannot miss; vanishes if the target dies
     this.pierce = false;
+    this.heroesOnly = false;    // Deadeye: minions never block or trigger the hit
+    this.execScale = false;     // recompute damage from missing HP at impact
     this.slot = '';             // caller tag ('auto' | 'q' | 'r' ...)
     this.damage = 0;
     this.dtype = 'physical';
@@ -102,6 +104,8 @@ export class Effects {
     p.owner = null;
     p.target = null;
     p.pierce = false;
+    p.heroesOnly = false;
+    p.execScale = false;
     p.slot = '';
     p.damage = 0;
     p.dtype = 'physical';
@@ -207,6 +211,7 @@ export class Effects {
     for (let i = 0; i < units.length; i++) {
       const u = units[i];
       if (!u.alive || u.invulnerable || u.isStatic || u.team === p.team) continue;
+      if (p.heroesOnly && u.kind !== 'hero') continue;
       const dx = u.pos.x - p.pos.x;
       const dz = u.pos.z - p.pos.z;
       const rr = p.radius + u.radius;
