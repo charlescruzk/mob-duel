@@ -75,7 +75,9 @@ export class Hero extends Unit {
     this.syncMesh();
     effects.attach(scene, world);
     this._onUnitDied = (p) => this._handleUnitDied(p.unit, p.source);
+    this._onAbilityHit = (p) => this._handleAbilityHit(p);
     this._unsub = events.on('unitDied', this._onUnitDied);
+    this._unsubAbilityHit = events.on('abilityHit', this._onAbilityHit);
   }
 
   // Contract read-throughs.
@@ -83,6 +85,7 @@ export class Hero extends Unit {
   get isCasting() { return this.abilities.isCasting; }
   get stunTimer() { return this.abilities.stunTimer; }
   get stealthed() { return this.abilities.stealthed; }
+  get rooted() { return this.abilities.rooted; }
   get slowTimer() { return this.abilities.slowTimer; }
   get slowPct() { return this.abilities.slowPct; }
   get stunned() { return this.abilities.stunned; }
@@ -227,6 +230,14 @@ export class Hero extends Unit {
 
   // --- progression -------------------------------------------------------
 
+  // Riptide (Lumen passive): landing an ability — an 'abilityHit' whose hero is this
+  // — grants a short haste. Other heroes' hits are ignored by the owner check.
+  _handleAbilityHit(p) {
+    if (p.hero !== this || !this.alive) return;
+    const pas = this.data.passive;
+    if (pas && pas.kind === 'riptide') this.applyStatus('haste', pas.hasteTime, pas.hastePct);
+  }
+
   _handleUnitDied(unit, source) {
     if (unit === this || unit.team === this.team) return;
     // Verdict (Kesh R): a hero kill inside the strike window refunds half the cooldown.
@@ -284,6 +295,7 @@ export class Hero extends Unit {
 
   dispose() {
     if (this._unsub) { this._unsub(); this._unsub = null; }
+    if (this._unsubAbilityHit) { this._unsubAbilityHit(); this._unsubAbilityHit = null; }
     if (this.mesh && this.mesh.parent) this.mesh.parent.remove(this.mesh);
   }
 }

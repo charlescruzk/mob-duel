@@ -277,9 +277,64 @@ export const HEROES = {
       },
     },
   },
+
+  lumen: {
+    key: 'lumen',
+    name: 'Lumen',
+    title: 'the Tidecaller',
+    role: 'ranged controller',
+    primary: 'int',
+    ranged: true,
+    hp: { base: 470, step: 60 },
+    mp: { base: 420, step: 45 },
+    hpRegen: { base: 1.2, step: 0.12 },
+    mpRegen: { base: 2.0, step: 0.22 },
+    moveSpeed: 5.0,
+    attackRange: 6.5,
+    attackDamage: { base: 44, step: 4 },
+    attackInterval: 0.95,
+    windup: 0.25,
+    projectileSpeed: 20.0,
+    armor: { base: 0.08, step: 0.01 },
+    passive: {
+      key: 'p', name: 'Riptide', kind: 'riptide',
+      desc: 'Landing any ability grants +15% move speed for 1.5 s.',
+      hastePct: 0.15, hasteTime: 1.5,
+    },
+    abilities: {
+      q: {
+        slot: 'q', name: 'Tidal Snare', cost: 50, cd: 9.0, range: 10.0, shape: 'skillshot',
+        radius: 0.6, speed: 20.0, pierce: false, damage: { base: 55, step: 14 },
+        rootTime: 1.5,
+        desc: 'Line skillshot, 10 m, stops at the first enemy hit: damage and a 1.5 s root.',
+      },
+      w: {
+        slot: 'w', name: 'Mend', cost: 60, cd: 11.0, range: 0, shape: 'heal',
+        heal: { base: 80, step: 28 }, hotRate: { base: 20, step: 5 }, hotTime: 3.0,
+        desc: 'Heal self 80 instantly, then 20 per second for 3 s.',
+      },
+      e: {
+        slot: 'e', name: 'Undertow', cost: 65, cd: 12.0, range: 7.0, shape: 'groundAoe',
+        telegraph: 0.4, radius: 3.0, damage: { base: 50, step: 15 },
+        slowPct: 0.40, slowTime: 1.5, pull: 2.0,
+        desc: 'Ground circle r3 at the reticle (7 m). 0.4 s telegraph, then enemies '
+          + 'inside are pulled 2 m toward the centre, take damage and a 40% slow 1.5 s.',
+      },
+      r: {
+        slot: 'r', name: 'Deluge', cost: 120, cd: 70.0, range: 6.0, shape: 'groundAoe',
+        telegraph: 0.5, radius: 5.0,
+        zone: { radius: 5.0, duration: 3.5, slowPct: 0.50, slowTime: 0.5,
+          tickInterval: 0.5, tickDamage: { base: 40, step: 12 }, healPct: 0.03,
+          color: 0x2fa8c8 },
+        desc: 'Ground circle r5 at the reticle (6 m): a 3.5 s tide that slows enemies '
+          + 'inside by 50% and deals damage every 0.5 s, while healing Lumen 3% max HP '
+          + 'per second inside it.',
+      },
+    },
+  },
 };
 
-export const HERO_KEYS = ['brakk', 'ilyra', 'vaskra', 'kesh', 'halvard'];
+export const HERO_KEYS = ['brakk', 'ilyra', 'vaskra', 'kesh', 'halvard', 'lumen'];
 
 // Brakk ↔ Ilyra for the original pairing; every other hero bot-fills as Brakk until
 // hero select (Task 7) wires ?enemy=.

@@ -8,11 +8,14 @@ import { atLevel } from './heroData.js';
 import { knockApply } from './heroKnock.js';
 import * as passives from '../economy/passives.js';
 import { effects } from './effects.js';
+import { events } from '../core/events.js';
 
 const hits = [];                       // world.enemiesInRadius out-array
 const dir = { x: 0, z: 0 };
 const centre = { x: 0, z: 0 };
 const pt = { x: 0, y: 0, z: 0 };       // blink target; physics helpers only touch x/z
+const pullDir = { x: 0, z: 0 };        // Undertow pull scratch
+const hitPayload = { hero: null, unit: null, dealt: 0 };   // 'abilityHit' payload
 const COLOR_DAMAGE = 0xffa040;
 const COLOR_TELEGRAPH = 0xff5030;
 const COLOR_BLINK = 0x9fd6ff;
@@ -48,6 +51,8 @@ export function abilityHit(hero, sys, unit, raw, dtype) {
   if (passives.blockedBySpellShield(hero, unit)) return 0;
   const dealt = unit.takeDamage(raw * passives.opportunistMult(hero, unit), hero, dtype || 'magic');
   passives.onAbilityHit(hero, unit, dealt);
+  hitPayload.hero = hero; hitPayload.unit = unit; hitPayload.dealt = dealt;
+  events.emit('abilityHit', hitPayload);
   if (sys.marksEnabled && unit.alive) sys.markUnit(unit);
   return dealt;
 }
@@ -64,6 +69,19 @@ export function aoeDamage(hero, sys, def, cx, cz) {
     const u = hits[i];
     if (u.kind === 'tower' || u.kind === 'nexus') continue;
     abilityHit(hero, sys, u, dmg);
+    if (def.pull) {
+      // Undertow: drag each enemy up to `pull` metres toward the centre, never
+      // past it. The world's per-frame box/bounds/separation pass clamps this.
+      let dx = cx - u.pos.x;
+      let dz = cz - u.pos.z;
+      const d = Math.sqrt(dx * dx + dz * dz);
+      if (d > 1e-4) {
+        const step = d < def.pull ? d : def.pull;
+        pullDir.x = dx / d; pullDir.z = dz / d;
+        u.pos.x += pullDir.x * step;
+        u.pos.z += pullDir.z * step;
+      }
+    }
     if (def.slowPct) applyStatusTo(u, 'slow', def.slowTime, def.slowPct);
     if (def.stunTime) applyStatusTo(u, 'stun', def.stunTime, 1);
     struck++;
@@ -184,6 +202,7 @@ export function castSkillshot(hero, sys, def, aimX, aimZ) {
   p.pierce = !!def.pierce;
   p.heroesOnly = !!def.heroesOnly;
   p.execScale = !!def.execScale;
+  p.root = def.rootTime || 0;
   p.slot = def.slot;
   p.damage = scaledDamage(hero, def);
   p.dtype = def.dtype || 'magic';

@@ -352,6 +352,54 @@ state; sim code never imports `fx/`.
   rather than a slide; how oppressive the 40 % zone slow feels; shield-plate silhouette
   readability from behind.
 
+### Task 6 — Lumen the Tidecaller
+
+- [x] Hero data (`heroData.js`): hp 470/60, mp 420/45, regen 1.2/2.0, AD 44/4 at 0.95 s
+      interval, ranged (6.5 m, projectile 20 m/s), armor 0.08/0.01, moveSpeed 5.0.
+      Passive **Riptide**: landing any ability grants +15 % move speed for 1.5 s.
+- [x] `abilityHit` event: emitted from `abilityLib.abilityHit` after damage lands
+      (payload `{hero, unit, dealt}` reused at module level per the EventBus rule).
+      Lumen subscribes in the Hero constructor and unsubscribes on dispose; other
+      heroes' hits are ignored by the owner check.
+- [x] Q **Tidal Snare** (`skillshot` + `root`): line skillshot 10 m at speed 20, stops
+      at the first enemy hit — damage plus a 1.5 s root. The root rides the projectile
+      payload (`p.root = def.rootTime`) and applies in `projectileHit` only when damage
+      actually landed (a spell-shielded hit does not root).
+- [x] W **Mend** (`heal`): instant 80 + 20/s for 3 s. The HoT lives on `sys.hot` and is
+      ticked by the AbilitySystem alongside the zone tick; `clearStatus` zeroes it, so
+      it dies with death/respawn/reset like every other status.
+- [x] E **Undertow** (`groundAoe.pull`): r3 at the reticle (7 m), 0.4 s telegraph, then
+      each enemy inside is displaced up to 2 m toward the centre in one instant step
+      (clamped at the centre distance; the world's separation/bounds pass clamps the
+      result) plus damage and a 40 % slow 1.5 s.
+- [x] R **Deluge** (`groundAoe` + `zone`): r5 at the reticle (6 m), 0.5 s telegraph,
+      then a 3.5 s tide — 50 % slow re-applied every frame, 40+12/lvl damage per 0.5 s
+      tick, and the caster heals 3 % max HP/s while inside. Reuses the Earthbreaker
+      zone machinery via `startZone`; the groundAoe resolver branches on `def.zone`
+      (zone instead of burst damage).
+- [x] Hero `rooted` getter added (matches `stunned`/`stealthed` accessors) — the probe
+      caught that root state had no public read.
+- [x] Bot kit + mesh: tidal headpiece + water orb, trim 0x2fa8c8; BOT_KIT entry for the
+      bot's cast heuristics.
+- Assumptions (spec silent):
+  - Mend does **not** trigger Riptide — heals are not "landings" and never emit
+    `abilityHit`; only damage instances do.
+  - Deluge's zone ticks *are* ability hits, so each tick refreshes Riptide while the
+    caster stands inside.
+  - Undertow pull is an instant displacement (not knockback speed-over-time), clamped
+    so an enemy already inside `pull` metres of the centre doesn't overshoot it.
+  - Deluge reuses the groundAoe telegraph (0.5 s) and lands its zone at the clamped
+    reticle point; there is no initial burst damage.
+- Probe: new block `lumen: tidal snare root, mend heal+hot, undertow pull, deluge zone,
+  riptide haste, abilityHit event` via `restart('hero=lumen&enemy=brakk&lowfx=1')` —
+  7 assertions, **129/129 total** (was 122), exit 0, no code errors. No game bugs this
+  time; the two failures were probe-side: the Hero had no `rooted` getter (added), and
+  the first pull test placed the enemy exactly at the field centre, where a pull toward
+  the centre correctly does nothing — the test now offsets the enemy 1 m.
+- Not verifiable by the probe: whether the 0.4 s telegraph reads as *duckable*; whether
+  the 2 m snap-pull feels like a drag or a teleport; Deluge's 3 %/s self-heal balance
+  while tanking inside the tide.
+
 ## Known gaps, deliberately not in the slice
 
 - Multiplayer. `docs/NETCODE.md` is the decision: server-authoritative at 20 Hz, intents

@@ -44,6 +44,13 @@ export const BOT_KIT = {
     e: { cost: 55, range: 8.0, radius: 1.2, base: 40, step: 10, level: 1 },
     r: { cost: 100, range: 5.0, radius: 5.0, base: 120, step: 30, level: 4 },
   },
+  lumen: {
+    melee: false,
+    q: { cost: 50, range: 10.0, radius: 0.6, base: 55, step: 14, level: 1 },
+    w: { cost: 60, range: 0, radius: 0, base: 0, step: 0, level: 1 },
+    e: { cost: 65, range: 7.0, radius: 3.0, base: 50, step: 15, level: 1 },
+    r: { cost: 120, range: 6.0, radius: 5.0, base: 40, step: 12, level: 4 },
+  },
 };
 
 // Which kit a hero runs. Falls back on attack range when the hero exposes no key.
@@ -56,6 +63,7 @@ export function kitOf(hero) {
     if (s.indexOf('vaskra') >= 0) return BOT_KIT.vaskra;
     if (s.indexOf('kesh') >= 0) return BOT_KIT.kesh;
     if (s.indexOf('halvard') >= 0) return BOT_KIT.halvard;
+    if (s.indexOf('lumen') >= 0) return BOT_KIT.lumen;
   }
   return (hero.attackRange || 2) <= 2.5 ? BOT_KIT.brakk : BOT_KIT.ilyra;
 }

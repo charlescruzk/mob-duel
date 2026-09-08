@@ -7,7 +7,7 @@ import { RADII, HEIGHTS, TEAM_COLOR } from '../map/laneData.js';
 
 const BODY_R = RADII.hero * 0.84;
 
-const TRIM = { brakk: 0x6b6b6b, ilyra: 0xf2c84b, vaskra: 0x9fd6ff, kesh: 0xb06be0, halvard: 0x8a9aa8 };
+const TRIM = { brakk: 0x6b6b6b, ilyra: 0xf2c84b, vaskra: 0x9fd6ff, kesh: 0xb06be0, halvard: 0x8a9aa8, lumen: 0x2fa8c8 };
 
 export function buildHeroMesh(heroKey, team) {
   const color = TEAM_COLOR[team];
@@ -57,6 +57,16 @@ export function buildHeroMesh(heroKey, team) {
     const cowl = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.28, 0.75), trimMat);
     cowl.position.y = HEIGHTS.hero - 0.32;
     g.add(cowl);
+  } else if (heroKey === 'lumen') {
+    // Tidecaller: a tidal headpiece and a floating water orb held out front.
+    const crest = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.5, 3), trimMat);
+    crest.rotation.x = Math.PI / 2;
+    crest.position.y = HEIGHTS.hero + 0.08;
+    g.add(crest);
+    const orb = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8),
+      new THREE.MeshBasicMaterial({ color: 0x2fa8c8 }));
+    orb.position.set(0, HEIGHTS.hero * 0.65, -0.55);
+    g.add(orb);
   } else {
     // Cinderweaver: a tall cone hat and a floating ember orb.
     const hat = new THREE.Mesh(new THREE.ConeGeometry(0.36, 0.7, 10), trimMat);

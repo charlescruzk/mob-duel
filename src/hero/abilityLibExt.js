@@ -17,6 +17,7 @@ const zoneHits = [];              // shared out-array for the zone tick
 const COLOR_DAMAGE = 0xffa040;
 const COLOR_BLINK = 0x9fd6ff;
 const COLOR_STEALTH = 0x9f6bd6;
+const COLOR_HEAL = 0x60e0a0;
 
 export function castBuff(hero, sys, def) {
   sys.applyStatus(def.buffKind, def.buffTime, def.buffPct);
@@ -29,7 +30,7 @@ export function castBuff(hero, sys, def) {
 }
 
 // Projectile impact with Deadeye's exec scale: the bonus reads the target's missing
-// HP at impact, capped at x2.
+// HP at impact, capped at x2. Tidal Snare roots on a landed hit only.
 export function projectileHit(hero, sys, p, u) {
   let raw = p.damage;
   if (p.execScale && u.maxHp > 0) {
@@ -37,7 +38,18 @@ export function projectileHit(hero, sys, p, u) {
     if (mult > EXEC_CAP) mult = EXEC_CAP;
     raw = p.damage * mult;
   }
-  return lib.abilityHit(hero, sys, u, raw, p.dtype);
+  const dealt = lib.abilityHit(hero, sys, u, raw, p.dtype);
+  if (p.root && dealt > 0) lib.applyStatusTo(u, 'root', p.root, 1);
+  return dealt;
+}
+
+// Mend: instant heal plus a heal-over-time the AbilitySystem ticks (cleared with the
+// other statuses on death/reset).
+export function castHeal(hero, sys, def) {
+  hero.heal(atLevel(def.heal, hero.level));
+  sys.hot.rate = atLevel(def.hotRate, hero.level);
+  sys.hot.timer = def.hotTime;
+  effects.spawnRing(hero.pos, 0.8, 0.3, COLOR_HEAL);
 }
 
 // The enemy unit nearest the reticle point within def.range of it (heroes and

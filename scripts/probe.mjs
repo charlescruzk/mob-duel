@@ -887,6 +887,76 @@ async function main() {
     } catch (e) { return { error: String((e && e.stack) || e) }; }
   })()`);
 
+  await restart('hero=lumen&enemy=brakk&lowfx=1');
+
+  await block('lumen: tidal snare root, mend heal+hot, undertow pull, deluge zone, riptide haste, abilityHit event', `(async () => {
+    try {
+    ${SETUP}
+    const I = H.intent;
+    // Mid-lane; regens zeroed so heal/damage windows are exact. Brakk armour 0.15
+    // (×0.85). H is Lumen at (0,0); E is Brakk.
+    H.teleport(0, 0); E.teleport(0, 5); fresh(H); fresh(E);
+    H.hpRegen = 0; E.hpRegen = 0; H.mpRegen = 0; E.mpRegen = 0;
+
+    // abilityHit event: counted across the Q window below.
+    let hits = 0;
+    const offHit = g.events.on('abilityHit', (p) => { if (p.hero === H) hits++; });
+
+    // Q: line skillshot 10 m at speed 20 — from 5 m out the hit lands ~0.3 s in:
+    // 55 raw ×0.85, a 1.5 s root, 50 mana, 9 s cd. Riptide grants haste on the hit.
+    const ehpQ = E.hp;
+    I.aimX = 0; I.aimZ = 5;
+    edge(I, 'q'); step(0.4);
+    r.lumenQRoots = E.rooted === true && near(ehpQ - E.hp, 55 * 0.85, 1.5)
+      && near(H.mp, H.maxMp - 50, 1e-3) && near(H.cooldowns.q, 9 - 0.45, 0.15);
+    r.lumenRiptideHaste = H.abilities.hastePct === 0.15 && H.abilities.hasteTimer > 0;
+    r.abilityHitEventFires = hits === 1;
+    offHit();
+    step(1.2);                                   // haste (1.5 s) expires
+    fresh(H);
+
+    // W: Mend heals 80 instantly and 20/s for 3 s after; heals never fire the
+    // abilityHit event, so no Riptide from it.
+    H.hp = 200;
+    const mpW = H.mp;
+    edge(I, 'w');
+    const afterW = H.hp;
+    step(1.0);
+    r.lumenWHealsInstantAndOverTime = near(afterW - 200, 80, 0.5)
+      && near(H.hp - afterW, 20, 0.5) && near(H.mp, mpW - 60, 1e-3);
+    fresh(H);
+
+    // E: ground circle r3 at the reticle (in range 7). 0.4 s telegraph, then the
+    // pull drags Brakk toward the centre: Brakk sits 1 m off it (aim 4, E at 5),
+    // so the pull takes him the full 1 m → z = 4, with 50 raw ×0.85 and a 40% slow.
+    const ehpE = E.hp;
+    I.aimX = 0; I.aimZ = 4;
+    edge(I, 'e'); step(0.5);
+    r.lumenEPullsToward = near(E.pos.z, 4, 0.3) && E.slowPct === 0.40
+      && near(ehpE - E.hp, 50 * 0.85, 1.5);
+    fresh(H); fresh(E);
+
+    // R at level 4 (unlock): 0.5 s telegraph, then a 3.5 s r5 tide at the reticle
+    // (in range 6): 50% slow, 76 (40+3×12) raw per 0.5 s tick ×0.85, and Lumen
+    // heals 3% max HP/s standing inside it (4 m from the centre, r5).
+    H.level = 4; H.recomputeStats();
+    H.hpRegen = 0; H.mpRegen = 0;                // recomputeStats restores them
+    fresh(H); fresh(E);
+    E.maxHp = 3000; E.hp = 2500;
+    H.teleport(0, 0); E.teleport(0, 4);
+    H.hp = 300;
+    I.aimX = 0; I.aimZ = 4;
+    edge(I, 'r'); step(0.7);
+    r.lumenRTicksAndSlows = H.abilities.zone.active === true && E.slowPct === 0.50;
+    const ehpR = E.hp;
+    step(1.05);                                  // zone has run 1.25 s → 2 ticks
+    r.lumenRTicksAndSlows = r.lumenRTicksAndSlows
+      && near(ehpR - E.hp, 2 * 76 * 0.85, 3) && H.abilities.zone.active === true;
+    r.lumenRHealsCasterInside = near(H.hp - 300, 0.03 * H.maxHp * 1.25, 2);
+    return r;
+    } catch (e) { return { error: String((e && e.stack) || e) }; }
+  })()`);
+
   ws.close();
   try { server.kill('SIGKILL'); } catch { /* gone */ }
   try { chrome.kill('SIGKILL'); } catch { /* gone */ }

@@ -36,6 +36,7 @@ export class AbilitySystem {
     this.bonusAutoTimer = 0; this.bonusAutoDmg = 0;
     // Auto-applied slow window (Quickdraw W): while up, basic attacks slow the target.
     this.autoSlowTimer = 0; this.autoSlowPct = 0; this.autoSlowTime = 0;
+    this.hot = { rate: 0, timer: 0 };      // Mend's heal-over-time
     this.stealthHaste = 0;                 // Veil's +25% move speed while stealthed
     this.strikeUnit = null; this.strikeUntil = 0;   // Verdict refund tracking
     this._aim = { x: 0, z: 0 };            // wind-up aim scratch
@@ -102,6 +103,10 @@ export class AbilitySystem {
         break;
       case 'buff':
         ext.castBuff(hero, this, def);
+        this.startCooldown(slot);
+        break;
+      case 'heal':
+        ext.castHeal(hero, this, def);
         this.startCooldown(slot);
         break;
       case 'stealth':
@@ -216,10 +221,17 @@ export class AbilitySystem {
       this.field.timer -= dt;
       if (this.field.timer <= EPS) {
         this.field.active = false;
-        lib.landField(hero, this, this.field.def, this.field.x, this.field.z);
+        // Deluge is a groundAoe that leaves a zone instead of burst damage.
+        if (this.field.def.zone) ext.startZone(hero, this, this.field.def.zone, this.field.x, this.field.z);
+        else lib.landField(hero, this, this.field.def, this.field.x, this.field.z);
       }
     }
     if (this.zone.active) ext.tickZone(hero, this, dt);
+    if (this.hot.timer > 0) {
+      this.hot.timer -= dt;
+      if (this.hot.timer <= 0) { this.hot.timer = 0; this.hot.rate = 0; }
+      else hero.heal(this.hot.rate * dt);
+    }
   }
 
   // Veil leaves stealth (expiry, attack or cast) — the resolver lives in ext.

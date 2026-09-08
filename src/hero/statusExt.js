@@ -50,6 +50,7 @@ export function clearStatus(sys) {
   sys.reflectTimer = 0; sys.reflectVal = 0;
   sys.bonusAutoTimer = 0; sys.bonusAutoDmg = 0;
   sys.autoSlowTimer = 0; sys.autoSlowPct = 0; sys.autoSlowTime = 0;
+  sys.hot.rate = 0; sys.hot.timer = 0;
   endZone(sys);                      // zone dies with its caster
   sys.hero.refreshArmor();
   sys.hero.shield = 0;
