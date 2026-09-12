@@ -26,7 +26,17 @@ Track status in `docs/PROGRESS.md`.
 - One concern per file. Follow `docs/ARCHITECTURE.md` exactly.
 - No external dependencies of any kind (no other CDN scripts, no npm packages).
 - Primitive geometry and procedurally generated canvas textures only. No asset files.
-- Do not create files outside `src/`, `docs/`, `index.html`, and `scripts/`.
+- Do not create files outside `src/`, `docs/`, `index.html`, `scripts/`, and `server/`.
+- `server/` (Phase 4) is a Node program using **built-in modules only** (`node:http`,
+  `node:crypto`, `node:net`) — the WebSocket handshake and framing are written by hand,
+  no `ws` package. It imports the simulation from `src/sim/` unchanged.
+- `src/sim/` never imports `three` or touches the DOM. `src/view/` and `src/fx/` read sim
+  state and render it; they never mutate it. This is what lets the same sim run on the
+  server (`docs/NETCODE.md`).
+- **Mobile is a first-class target.** Everything must work with touch and no pointer
+  lock (see `docs/PHASE3.md` §6). Test at 390×844 (phone, landscape) and desktop.
+- Deployed client: GitHub Pages from `main` at https://charlescruzk.github.io/mob-duel/.
+  Nothing may depend on being served from the site root — all paths stay relative.
 - No real game's hero, ability or item names. Generic or original names only.
 
 ## Coding conventions
