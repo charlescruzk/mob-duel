@@ -40,6 +40,12 @@ export default async function ({ block, report, restart, send, sleep, ROOT }) {
       await new Promise((res) => setTimeout(res, 1500));
       H.intent.moveZ = 0;
       r.intentMovesMirroredHero = H.pos.z < z0 - 3;
+      // Prediction: the local hero stepped locally every frame and the server's
+      // acknowledged positions never disagreed by more than a snap distance.
+      const mir = g.net.mirror;
+      r.localHeroPredicted = mir.local === H && mir.predictedFrames > 30;
+      r.predictionReconciles = Math.abs(mir.errX) < 1.0 && Math.abs(mir.errZ) < 1.0 && Math.abs(H.pos.z - mir.targets.get(H).z) < 1.5;
+      r.serverAcksIntents = g.net.client.pending.length === 0 && mir.snapshotsApplied > 0 && mir.history[0] !== undefined;
       r.meshFollowsMirror = Math.abs(H.mesh.position.z - H.pos.z) < 1e-6;
       r.hudReadsMirroredHero = document.getElementById('hp-num') ? document.getElementById('hp-num').textContent.indexOf(String(Math.round(H.maxHp))) >= 0 : true;
       r.botDrivesEnemy = Math.abs(E.pos.z) < 36.9 || E.pos.x !== 0;   // the server's bot walked

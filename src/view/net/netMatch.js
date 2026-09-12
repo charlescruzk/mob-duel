@@ -21,6 +21,7 @@ export class NetMatch {
     this.intent = this.hero.intent;         // written by the controller each frame
     this.outgoing = makeIntent();           // what actually goes on the wire this tick
     this._acc = 0; this._tick = 0;
+    this.mirror.setLocal(this.hero, this.seat);
     this._bannerText = null;
     this._showBanner('READY');
     this.bot = null;                        // the server runs the bot
@@ -39,6 +40,7 @@ export class NetMatch {
     if (this._acc >= TICK_DT) {
       this._acc -= TICK_DT;
       if (this._acc > TICK_DT) this._acc = 0;
+      this.mirror.recordPrediction(this._tick);
       this.client.sendIntent(this._tick++, this.outgoing);
       this._unlatch();
     }

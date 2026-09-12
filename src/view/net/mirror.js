@@ -13,9 +13,12 @@ import { Tower } from '../../sim/units/tower.js';
 import { Nexus } from '../../sim/units/nexus.js';
 import { effects } from '../../sim/hero/effects.js';
 import { resolveItem, consumableEntry } from '../../sim/economy/items.js';
-import { POSITIONS } from '../../sim/map/laneData.js';
+import { POSITIONS, WALL_BOXES, LANE_BOUNDS } from '../../sim/map/laneData.js';
+import { resolveCircleVsBoxes, clampToBounds } from '../../sim/core/physics.js';
 
 const EASE = 18;                 // 1/s: positions converge on the snapshot in ~60 ms
+const CORRECT = 10;              // 1/s: how fast a prediction error is folded back in
+const HISTORY = 64;              // predicted positions kept per intent tick (3.2 s)
 const SNAP_DIST = 3.0;           // metres: beyond this, snap instead of easing
 const spawnScratch = { x: 0, y: 0, z: 0 };
 const minionOpts = { ranged: false, wave: 0 };
@@ -36,6 +39,22 @@ export class MirrorWorld {
     this.eventsApplied = 0;
     this.snapshotsApplied = 0;
     this._seen = new Set();
+    // Client-side prediction for the local hero's movement (docs/PHASE4.md): the
+    // world carries the real collision so predicted steps clamp like the server's.
+    this.world.setCollision(WALL_BOXES, LANE_BOUNDS);
+    this.local = null; this.localSeat = -1;
+    this.history = new Float32Array(HISTORY * 3);   // [tick, x, z] ring by tick
+    this.errX = 0; this.errZ = 0;                   // pending correction
+    this.corrections = 0; this.predictedFrames = 0;
+  }
+
+  setLocal(hero, seat) { this.local = hero; this.localSeat = seat; }
+
+  // NetMatch calls this when it sends the intent for `tick`: remember where we were.
+  recordPrediction(tick) {
+    if (!this.local) return;
+    const i = (tick % HISTORY) * 3;
+    this.history[i] = tick; this.history[i + 1] = this.local.pos.x; this.history[i + 2] = this.local.pos.z;
   }
 
   hero(team) { return this.world.hero(team); }
@@ -52,6 +71,7 @@ export class MirrorWorld {
   _apply(s) {
     this.tick = s.tick; this.time = s.time; this.state = s.state; this.countdown = s.cd; this.winner = s.winner;
     this.world.time = s.time;
+    if (s.ack && this.localSeat >= 0) this._reconcile(s.ack[this.localSeat]);
     const seen = this._seen; seen.clear();
     for (let i = 0; i < s.u.length; i++) {
       const o = s.u[i];
@@ -73,6 +93,15 @@ export class MirrorWorld {
     this.snapshotsApplied++;
   }
 
+  // Compare the server's position for the acked tick with what we predicted then;
+  // the difference is folded into the current prediction over the next frames.
+  _reconcile(ack) {
+    if (ack < 0 || !this.local) return;
+    const i = (ack % HISTORY) * 3;
+    if (this.history[i] !== ack) return;
+    this._ackX = this.history[i + 1]; this._ackZ = this.history[i + 2]; this._ackValid = true;
+  }
+
   _create(o) {
     let u = null;
     if (o.k === 'hero') { u = new Hero(o.hk, o.tm, this.world); u.intent = makeIntent(); }
@@ -91,7 +120,15 @@ export class MirrorWorld {
   _applyUnit(u, o) {
     const t = this.targets.get(u);
     t.x = o.x; t.z = o.z; t.f = o.f;
-    if (Math.abs(u.pos.x - o.x) > SNAP_DIST || Math.abs(u.pos.z - o.z) > SNAP_DIST) { u.pos.x = o.x; u.pos.z = o.z; u.prevPos.copy(u.pos); }
+    if (u === this.local && this._predicting(u)) {
+      if (this._ackValid) {
+        const ex = o.x - this._ackX, ez = o.z - this._ackZ;
+        this._ackValid = false;
+        if (Math.abs(ex) > SNAP_DIST || Math.abs(ez) > SNAP_DIST) { u.pos.x = o.x; u.pos.z = o.z; u.prevPos.copy(u.pos); this.errX = 0; this.errZ = 0; }
+        else { this.errX = ex; this.errZ = ez; }
+        if (ex !== 0 || ez !== 0) this.corrections++;
+      }
+    } else if (Math.abs(u.pos.x - o.x) > SNAP_DIST || Math.abs(u.pos.z - o.z) > SNAP_DIST) { u.pos.x = o.x; u.pos.z = o.z; u.prevPos.copy(u.pos); }
     u.hp = o.hp; u.maxHp = o.mhp; u.shield = o.sh; u.alive = o.a === 1; u.invulnerable = o.inv === 1;
     if (o.k === 'minion') { u.stunTimer = o.st[0]; u.slowTimer = o.st[1]; u.slowPct = o.st[2]; u.rootTimer = o.st[3]; u.wave = o.wv; return; }
     if (o.k !== 'hero') return;
@@ -160,14 +197,30 @@ export class MirrorWorld {
     }
   }
 
+  _predicting(u) { return u.alive && !u.abilities.dash.active && !u.stunned && !u.abilities.rooted && !u.isCasting && !u.isRecalling; }
+
   // Per frame: ease positions toward targets, derive velocity, mirror into meshes.
   update(dt) {
     const k = 1 - Math.exp(-EASE * dt);
     const inv = dt > 0 ? 1 / dt : 0;
     const list = this.list;
+    const kc = 1 - Math.exp(-CORRECT * dt);
     for (let i = 0; i < list.length; i++) {
       const u = list[i];
       const t = this.targets.get(u);
+      if (u === this.local && this._predicting(u)) {
+        u._move(dt, u.intent);
+        if (this.world.boxes.length) resolveCircleVsBoxes(u.pos, u.radius, this.world.boxes);
+        if (this.world.bounds) clampToBounds(u.pos, u.radius, this.world.bounds);
+        u.pos.x += this.errX * kc; u.pos.z += this.errZ * kc;
+        this.errX -= this.errX * kc; this.errZ -= this.errZ * kc;
+        this.predictedFrames++;
+        // Facing: the server's while acting, our own while walking.
+        if (u.intent.moveX === 0 && u.intent.moveZ === 0) { let df0 = t.f - u.facing; while (df0 > Math.PI) df0 -= Math.PI * 2; while (df0 < -Math.PI) df0 += Math.PI * 2; u.facing += df0 * k; }
+        u.vel.x = (u.pos.x - u.prevPos.x) * inv; u.vel.z = (u.pos.z - u.prevPos.z) * inv;
+        u.prevPos.copy(u.pos); u.syncMesh();
+        continue;
+      }
       u.pos.x += (t.x - u.pos.x) * k;
       u.pos.z += (t.z - u.pos.z) * k;
       let df = t.f - u.facing;

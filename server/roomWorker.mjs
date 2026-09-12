@@ -17,6 +17,8 @@ let tick = 0;
 let timer = null;
 let nextAt = 0;
 const eventLog = [];
+const pendingTick = [-1, -1];   // last intent tick received per seat
+const appliedTick = [-1, -1];   // ...and the one the last sim step consumed
 const EVENT_NAMES = ['abilityCast', 'abilityHit', 'unitDamaged', 'unitHealed', 'unitDied', 'heroDied', 'heroRespawned',
   'heroLevelUp', 'recallStarted', 'recallEnded', 'shotFired', 'nexusDestroyed', 'matchOver', 'gold'];
 
@@ -49,6 +51,7 @@ function loop() {
   const now = Date.now();
   let steps = 0;
   while (now >= nextAt && steps < 5) {        // catch up at most 5 ticks after a stall
+    appliedTick[0] = pendingTick[0]; appliedTick[1] = pendingTick[1];
     g.match.update(TICK_DT);
     tick++;
     nextAt += TICK_MS;
@@ -66,7 +69,7 @@ function emitSnapshot() {
   for (let i = 0; i < w.units.length; i++) units[i] = encodeUnit(w.units[i]);
   const snap = {
     t: 'snap', tick, time: Math.round(w.time * 100) / 100, state: g.match.state,
-    cd: Math.round(g.match.countdown * 100) / 100, winner: g.match.winner,
+    cd: Math.round(g.match.countdown * 100) / 100, winner: g.match.winner, ack: [appliedTick[0], appliedTick[1]],
     u: units, fx: encodeEffects(effects), ev: eventLog.length ? eventLog.slice() : [],
   };
   eventLog.length = 0;
@@ -83,5 +86,6 @@ parentPort.on('message', (m) => {
     const hero = m.seat === 0 ? g.hero : g.enemy;
     if (!seats[m.seat] || !seats[m.seat].taken) return;
     sanitizeIntent(m.i, hero.intent);
+    pendingTick[m.seat] = m.tick | 0;
   } else if (m.t === 'stop') { if (timer) clearTimeout(timer); process.exit(0); }
 });
