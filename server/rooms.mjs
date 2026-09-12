@@ -39,9 +39,9 @@ export class Room {
   get empty() { return !this.seats[0] && !this.seats[1]; }
 
   start() {
+    this.worker.postMessage({ t: 'start' });     // a second start is a rematch (worker resets)
     if (this.started) return;
     this.started = true;
-    this.worker.postMessage({ t: 'start' });
     this.broadcast(JSON.stringify({ t: 'start', heroes: this.heroes, room: this.code }));
   }
 

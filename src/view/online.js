@@ -55,6 +55,9 @@ export async function startOnline(opts, base) {
   });
   shopPanel.remote = match;
   wireStartGate(base, controller, shopPanel);
+  if (base.pause) base.pause.setRoom(client.joined.room, client.seat);
+  fx.result.onPlayAgain = () => match.reset();
+  fx.result.onChangeHero = () => { location.search = ''; };
 
   const game = {
     engine, input, camera, controller, intent: hero.intent, map: base.map, hud,

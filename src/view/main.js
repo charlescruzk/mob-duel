@@ -19,6 +19,8 @@ import { HEROES, HERO_KEYS } from '../sim/hero/heroData.js';
 import { effects } from '../sim/hero/effects.js';
 import { AbilityBar } from './hud/abilityBar.js';
 import { HeroSelect } from './hud/heroSelect.js';
+import { Lobby } from './hud/lobby.js';
+import { PauseMenu } from './hud/pauseMenu.js';
 import { Tower } from '../sim/units/tower.js';
 import { Nexus } from '../sim/units/nexus.js';
 import { WaveSpawner } from '../sim/units/waveSpawner.js';
@@ -101,27 +103,27 @@ function boot() {
   const enemyKey = paramHero('enemy');
 
   const q = new URLSearchParams(location.search);
-  const base = { engine, input, world, scene, map, camera, controller, hud, unitViews, effectViews, shotViews, audio, touch };
+  const pause = new PauseMenu(overlay, audio, touch);
+  const base = { engine, input, world, scene, map, camera, controller, hud, unitViews, effectViews, shotViews, audio, touch, pause };
   if (q.get('server')) {
     // Multiplayer (docs/PHASE4.md): the server simulates; this page mirrors and renders.
     if (overlay) overlay.classList.remove('hidden');
     startOnline({ server: q.get('server'), room: q.get('room') || 'new', hero: playerKey || HERO_KEYS[0], solo: q.has('solo') }, base)
       .then((g) => { game = g; });
   } else if (playerKey) {
-    game = startMatch(playerKey, enemyKey || seededEnemy(playerKey), {
-      engine, input, world, scene, map, camera, controller, hud, unitViews, effectViews, shotViews, audio, touch,
-    });
+    game = startMatch(playerKey, enemyKey || seededEnemy(playerKey), base);
   } else if (selectRoot) {
     selectRoot.classList.remove('hidden');
     if (overlay) overlay.classList.add('hidden');   // pick a hero first
     const bs = document.getElementById('boot-status');
     if (bs) bs.textContent = 'choose your hero · three r' + THREE.REVISION;
+    const lobby = new Lobby(selectRoot);
     new HeroSelect(selectRoot, (key) => {
       selectRoot.classList.add('hidden');
       if (overlay) overlay.classList.remove('hidden');
-      game = startMatch(key, enemyKey || seededEnemy(key), {
-        engine, input, world, scene, map, camera, controller, hud, unitViews, effectViews, shotViews, audio, touch,
-      });
+      const online = lobby.onlineParams(key);
+      if (online) startOnline(online, base).then((g) => { game = g; });
+      else game = startMatch(key, enemyKey || seededEnemy(key), base);
     });
   }
 }
@@ -174,6 +176,8 @@ function startMatch(playerKey, enemyKey, base) {
     towers, nexuses, camera, hud, abilityBar, shopPanel, consumables, passives, fx,
   });
   wireStartGate(base, controller, shopPanel);
+  fx.result.onPlayAgain = () => match.reset();
+  fx.result.onChangeHero = () => { location.search = ''; };
 
   const game = {
     engine, input, events, world, camera, controller, intent, map, hud,

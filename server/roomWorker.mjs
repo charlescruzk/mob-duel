@@ -30,7 +30,7 @@ function logEvent(name, p) {
 }
 
 function start() {
-  if (g) return;
+  if (g) { g.match.reset(); eventLog.length = 0; return; }   // rematch
   g = buildHeadlessMatch(seats[0].hero, seats[1].hero);
   ensureBots();                                // before the seats reference them
   // Empty seats are played by the bot; taken seats are driven by network intents.

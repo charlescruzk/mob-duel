@@ -8,6 +8,10 @@ import { DamageNumbers } from './hud/damageNumbers.js';
 import { RigAnimator } from './fx/rigAnimator.js';
 import { HitStop } from './fx/hitStop.js';
 import { effects } from '../sim/hero/effects.js';
+import { EnemyBars } from './hud/enemyBars.js';
+import { Minimap } from './hud/minimap.js';
+import { KillFeed } from './hud/killFeed.js';
+import { ResultScreen } from './hud/resultScreen.js';
 
 export function buildFx(base, world, hero) {
   const { engine, scene, camera, unitViews, effectViews, shotViews, audio, touch } = base;
@@ -16,9 +20,15 @@ export function buildFx(base, world, hero) {
   const damageNumbers = new DamageNumbers(engine.camera);
   const rigAnimator = new RigAnimator(world);
   const hitStop = new HitStop();
+  const enemyBars = new EnemyBars(engine.camera, world, hero);
+  const minimap = new Minimap(world, hero);
+  const killFeed = new KillFeed();
+  const result = new ResultScreen();
+  result.attach(hero, world);
   const fx = {
     particles, abilityFx, damageNumbers, rigAnimator,
     unitViews, effectViews, shotViews, hitStop, audio, touch,
+    enemyBars, minimap, killFeed, result,
     viewScale: 1,
     update(dt) {
       const vdt = hitStop.scaled(dt);
@@ -26,8 +36,9 @@ export function buildFx(base, world, hero) {
       unitViews.update(); effectViews.update(); shotViews.update(vdt);
       abilityFx.update(vdt); rigAnimator.update(vdt); particles.update(vdt); damageNumbers.update(dt);
       touch.update(dt); audio.update(dt);
+      enemyBars.update(); minimap.update(); killFeed.update(dt);
     },
-    reset() { particles.reset(); abilityFx.reset(); damageNumbers.reset(); hitStop.reset(); audio.reset(); touch.reset(); },
+    reset() { particles.reset(); abilityFx.reset(); damageNumbers.reset(); hitStop.reset(); audio.reset(); touch.reset(); killFeed.reset(); result.hide(); },
   };
   return fx;
 }
