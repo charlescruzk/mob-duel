@@ -17,88 +17,75 @@ Deviations from `docs/DESIGN.md` fixed by the contract (use these, not the doc):
 ## 1. Folder layout
 
 ```
-index.html                 canvas, importmap (three@0.170.0), #start-overlay, #hud
-                           (#ability-bar and #shop roots reserved), boot-error script
-src/
-  main.js                  boot: builds every object once; ?hero=/?enemy= or the
-                           hero-select overlay picks the matchup, then startMatch wires
-                           heroes, structures, economy, bot, HUD and window.__game
-  core/
-    engine.js              Engine: renderer/scene/camera/lights/resize/loop; applies
-                           the Look (fx/look.js) and renders through its composer    (scaffold)
-    events.js              EventBus + shared `events`                             (scaffold)
-    input.js               Input: keyboard/mouse/pointer lock — the only device reader
-    physics.js             distXZ, inRangeXZ, separateCircles, resolveCircleVsBoxes,
-                           clampToBounds                                          (scaffold)
-    unit.js                Unit base class                                         (scaffold)
-    world.js               World registry + shared sim step                       (scaffold)
-  hero/
-    intent.js              makeIntent / clearIntent / copyIntent                  (scaffold)
-    heroController.js      Input + camera → HeroIntent                             (scaffold)
-    hero.js                class Hero extends Unit                                  HERO
-    heroData.js            the two heroes' numbers (DESIGN.md §3)                   HERO
-    abilities.js           cooldown/mana/cast-state machine per slot                HERO
-    abilityLib.js          the eight ability behaviours (Q/W/E/R × 2)               HERO
-    abilityLibExt.js       the new Phase 2 shapes (buff, targeted, cone, zone…)     HERO
-    statusExt.js           applyStatus/clearStatus extracted from abilities.js      HERO
-    heroStats.js           recomputeStats + refreshArmor (Unyielding) from hero.js  HERO
-    heroKnock.js           knockback displacement (Charge) — moves while stunned    HERO
-    effects.js             projectiles, telegraphs, dash/blink motion, marks        HERO
-    heroMesh.js            thin adapter over fx/rig.buildHeroRig + stealth fade      HERO
-  camera/
-    thirdPerson.js         ThirdPersonCamera rig                                  (scaffold)
-  map/
-    laneData.js            every position/radius/bound as data                   (scaffold)
-    laneBuilder.js         ground, strip, wall blocks, base markers                (scaffold)
-    textures.js            procedural canvas textures (ground, stone, discs, sky)  (scaffold)
-    materials.js           toon gradient/material + inverted-hull outline helpers  (Task 9)
-  units/
-    minion.js              class Minion extends Unit (melee + ranged)                UNITS
-    waveSpawner.js         WaveSpawner: t=15 s then every 30 s, 3+2 in formation     UNITS
-    tower.js               class Tower extends Unit                                  UNITS
-    nexus.js               class Nexus extends Unit                                  UNITS
-    unitMeshes.js          minion meshes via fx/rig.buildMinionRig; tower/nexus     UNITS
-  economy/
-    gold.js                GoldSystem: bounties + trickle from 'unitDied'      ECONOMY+BOT
-    items.js               the item table as data (Phase 2: 25 items)          ECONOMY+BOT
-    itemStats.js           item→stat aggregation if items.js runs out of room  ECONOMY+BOT
-    consumables.js         potion stacking/use (intent.useItem slots 1–6)      ECONOMY+BOT
-    passives.js            the nine item passives, called from the hit paths   ECONOMY+BOT
-    shop.js                Shop: consumes intent.buy inside the fountain       ECONOMY+BOT
-  ai/
-    heroBot.js             HeroBot: state machine, writes the red hero's intent  ECONOMY+BOT
-    botSense.js            delayed player view, snapshot, BOT_KIT (per-hero cast data) BOT
-    botActions.js          per-state intent writers (farm/trade/retreat/push)    ECONOMY+BOT
-    botBuy.js              per-hero item priority, potion/heal sustain           ECONOMY+BOT
-  fx/                      VISUALS ONLY — imports core/, map/ and reads unit state;
-                           sim code never imports fx/. Mesh builders here keep the
-                           { group, shield } contract and never mutate sim state.
-    particles.js           one THREE.Points particle system, pooled buffers          FX
-    abilityFx.js           (heroKey, slot) → colour + emitter recipe table           FX
-    look.js                shadows, tone mapping, sky, fog, bloom composer           FX
-    rig.js                 procedural hero/minion rigs built from primitives         FX
-    rigAnimator.js         joint-angle pose blender driven by unit state             FX
-  hud/
-    hud.js                 Hud shell: bars, gold, level, timer, respawn, reticle (scaffold)
-    abilityBar.js          fills #ability-bar from hero cooldowns                    HERO
-    shopPanel.js           fills #shop; visible only in fountain              ECONOMY+BOT
-    shopPanelTabs.js       tab/inventory sub-view if shopPanel.js runs out of room   ECONOMY
-    heroSelect.js          #hero-select overlay: six cards, pick → start overlay    HUD
-    damageNumbers.js       32 pooled floating damage numbers, world→screen           HUD
-  game/
-    match.js               Match: per-frame order, matchOver freeze, reset      INTEGRATOR
-scripts/
-  check.mjs                node --check every .js
-  probe.mjs                headless-Chrome harness; one `block` per feature
-docs/
-  DESIGN.md NETCODE.md ARCHITECTURE.md PROGRESS.md
+index.html                     canvas, importmap (three@0.170.0), overlays, HUD roots, boot watchdog
+src/sim/                       THE SIMULATION. No three, no DOM. Runs in the browser and in Node
+                               (scripts/simNode.mjs) unchanged — the future server (docs/PHASE4.md).
+src/view/                      Everything that renders or reads a device. Reads sim state, never writes it.
+  sim/ai/botActions.js         farm/trade/retreat actions
+  sim/ai/botBuy.js             item priorities
+  sim/ai/botSense.js           BOT_KIT per hero + perception
+  sim/ai/heroBot.js            HeroBot state machine
+  sim/core/events.js           EventBus + shared `events` (the only cross-system channel)
+  sim/core/physics.js          XZ helpers: separateCircles, resolveCircleVsBoxes, clampToBounds
+  sim/core/unit.js             Unit base class; `mesh`/`rig` are view-owned slots
+  sim/core/vec.js              Vec3 {x,y,z} with set/copy — the sim never imports three
+  sim/core/world.js            World registry, sim step, emits unitAdded/unitRemoved
+  sim/economy/consumables.js   potions: stacks and use
+  sim/economy/gold.js          Economy: bounties, trickle, XP
+  sim/economy/itemFields.js    full stat field set
+  sim/economy/items.js         25 items as data
+  sim/economy/passives.js      item passives
+  sim/economy/shop.js          buy/sell in fountain
+  sim/game/match.js            per-frame order, countdown/live/over, reset; presentation optional
+  sim/hero/abilities.js        cooldown/mana/cast/status state machine
+  sim/hero/abilityLib.js       ability resolvers (shapes)
+  sim/hero/abilityLibExt.js    Phase 2 shapes: targeted, cone, buff, heal, stealth, zones
+  sim/hero/effects.js          projectile/ring/zone records and hit sweeps (no meshes)
+  sim/hero/hero.js             class Hero extends Unit
+  sim/hero/heroAttack.js       basic attack timing and on-hit
+  sim/hero/heroData.js         every hero as data
+  sim/hero/heroItems.js        item application
+  sim/hero/heroKnock.js        knockback/pull displacement
+  sim/hero/heroRecall.js       recall channel
+  sim/hero/heroStats.js        derived stats
+  sim/hero/intent.js           HeroIntent plain data
+  sim/hero/statusExt.js        extra status kinds
+  sim/map/laneData.js          positions, radii, bounds, wall boxes (data only)
+  sim/units/minion.js          Minion
+  sim/units/nexus.js           Nexus
+  sim/units/shotPool.js        emits shotFired (tracers are view-side)
+  sim/units/tower.js           Tower
+  sim/units/waveSpawner.js     waves + minion pool
+  view/camera/thirdPerson.js   ThirdPersonCamera
+  view/core/engine.js          renderer/scene/lights/loop + Look
+  view/core/input.js           keyboard/mouse/pointer lock
+  view/fx/abilityFx.js         event → particle recipes, hit flash, shake
+  view/fx/effectViews.js       meshes mirroring effects records
+  view/fx/look.js              shadows, tone mapping, bloom, sky
+  view/fx/particles.js         particle pool
+  view/fx/rig.js               procedural rigs
+  view/fx/rigAnimator.js       pose blending
+  view/fx/shotViews.js         tracer flight from shotFired
+  view/fx/unitMeshes.js        tower/nexus/shot meshes
+  view/fx/unitViews.js         unitAdded/unitRemoved → meshes, shield bubble, stealth fade
+  view/heroController.js       Input + camera → HeroIntent
+  view/hud/abilityBar.js       cooldowns
+  view/hud/damageNumbers.js    pooled floating numbers
+  view/hud/heroSelect.js       six-card overlay
+  view/hud/hud.js              bars, gold, timer
+  view/hud/shopPanel.js        shop tabs
+  view/main.js                 boot, hero select, startMatch, window.__game
+  view/map/laneBuilder.js      lane meshes
+  view/map/materials.js        toon materials, outlines
+  view/map/textures.js         canvas textures
+scripts/check.mjs              node --check every .js
+scripts/probe.mjs              headless-Chrome harness + loader for scripts/probes/*.mjs
+scripts/probes/*.mjs           one plug-in per feature: `export default async (ctx) => {}`
+scripts/simNode.mjs            bot-vs-bot match in plain Node (npm run sim)
+docs/                          DESIGN NETCODE ARCHITECTURE PROGRESS PHASE2 PHASE3 PHASE4
 ```
 
-Rule of thumb: `core/` and `map/` are imported by everyone; `hero/`, `units/`,
-`economy/`, `ai/` import only `core/`, `map/` and their own folder; `fx/` imports
-`core/`, `map/` and reads unit state, but sim code (`hero/`, `units/`, `economy/`,
-`ai/`, `game/`) never imports `fx/`. Cross-system communication is events (§4).
-`hud/` reads state and listens; it never calls sim methods.
+Rule of thumb: `sim/` imports only `sim/`. `view/` imports `sim/` (data, events, classes) and `three`. Cross-system communication is events (§4). The view learns about units from `unitAdded` / `unitRemoved`, about shots from `shotFired`, and mirrors `effects` records each frame; `Unit.mesh` and `Unit.rig` are view-owned slots the sim never writes.
 
 ---
 
@@ -139,7 +126,7 @@ Consequences builders must respect:
 
 ## 3. Contracts (verbatim)
 
-### 3.1 `src/core/events.js`
+### 3.1 `src/sim/core/events.js`
 
 ```js
 export class EventBus { on(name, fn) → unsubscribe; off(name, fn); emit(name, payload); clear() }
@@ -148,7 +135,7 @@ export const events   // the one shared bus; import it, do not construct another
 Payload objects are owned by the emitter and REUSED across emits. Copy fields out in
 the listener; never store the payload.
 
-### 3.2 `src/core/unit.js`
+### 3.2 `src/sim/core/unit.js`
 
 ```js
 export class Unit {
@@ -174,7 +161,7 @@ export class Unit {
 }
 ```
 
-**Hero** (`src/hero/hero.js`, HERO builder) — `export class Hero extends Unit`:
+**Hero** (`src/sim/hero/hero.js`, HERO builder) — `export class Hero extends Unit`:
 
 ```js
 new Hero(heroKey, team, world, scene)        // heroKey: 'brakk' | 'ilyra'; adds its own mesh to scene
@@ -213,7 +200,7 @@ does `world.add(unit)` (constructors do not self-register). Minions target throu
 `unit.goldValue` / `unit.xpValue` fields (numbers) set in the constructors:
 melee 20/30, ranged 16/25, tower 150/200, nexus 0/0, hero `250 / (120 + 30 × level)`.
 
-### 3.3 `src/core/world.js`
+### 3.3 `src/sim/core/world.js`
 
 ```js
 export class World {
@@ -236,7 +223,7 @@ export class World {
 ```
 Scratch `out` arrays are module-level in the caller and reused. Never `.filter()`.
 
-### 3.4 `src/core/physics.js`
+### 3.4 `src/sim/core/physics.js`
 
 ```js
 distXZ(a, b) → m       distSqXZ(a, b)       inRangeXZ(a, b, r) → bool     (a, b: {x, z})
@@ -245,7 +232,7 @@ resolveCircleVsBoxes(pos, radius, boxes) → bool   // pushes pos out; true if i
 clampToBounds(pos, radius, bounds) → bool
 ```
 
-### 3.5 `src/hero/intent.js` — HeroIntent
+### 3.5 `src/sim/hero/intent.js` — HeroIntent
 
 ```js
 makeIntent() → { moveX: 0, moveZ: 0, aimX: 0, aimZ: 0, attack: false,
@@ -258,7 +245,7 @@ may hold them true for several frames (the bot holds 0.2 s); the hero fires once
 rising edge. `buy` −1 or item index 0..3; the shop consumes it on the rising edge
 (`prev === -1 && buy >= 0`). Numbers and booleans only; mutate in place.
 
-### 3.6 `src/hero/heroController.js`
+### 3.6 `src/view/heroController.js`
 
 ```js
 new HeroController(input, cameraRig)
@@ -268,7 +255,7 @@ controller.update(dt, intent, heroPos) → intent
 Keys: WASD move (camera-relative), LMB or Space attack, Q / **F** / E / R → q/w/e/r,
 B recall, Digit1–4 → buy 0–3. Aim = camera-centre ray ∩ y=0, clamped ≤ 12 m from heroPos.
 
-### 3.7 `src/camera/thirdPerson.js`
+### 3.7 `src/view/camera/thirdPerson.js`
 
 ```js
 new ThirdPersonCamera(camera, input)
@@ -281,7 +268,7 @@ setYaw(yaw)
 reticleOnGround(out) → bool   camera-centre ray ∩ y=0 into `out` (Vector3 or {set})
 ```
 
-### 3.8 `src/map/laneData.js`
+### 3.8 `src/sim/map/laneData.js`
 
 ```js
 TEAMS ['blue','red']      TEAM_COLOR { blue: 0x3b6fd6, red: 0xd64a3b }     enemyOf(team)
@@ -297,14 +284,14 @@ isInFountain(pos, team) → bool         distToTower(pos, team) → m (centre di
 `dir` is the team's forward along Z: a blue minion walks toward `nexus.z` of red, i.e.
 `z += dir × speed × dt`.
 
-### 3.9 `src/map/laneBuilder.js` / `textures.js`
+### 3.9 `src/view/map/laneBuilder.js` / `textures.js`
 
 ```js
 buildLane(scene) → { boxes: WALL_BOXES, positions: POSITIONS, group }
 makeGroundTexture(rx, ry)  makeStoneTexture(rx, ry)  makeDiscTexture(hex) → THREE.CanvasTexture
 ```
 
-### 3.10 `src/hud/hud.js`
+### 3.10 `src/view/hud/hud.js`
 
 ```js
 new Hud()
@@ -314,7 +301,7 @@ hud.showReticle(bool)      hud.invalidate()
 Reserved DOM roots: `#ability-bar` (HERO: abilityBar.js) and `#shop` (ECONOMY: shopPanel.js).
 Build children once in your constructor; update in place; guard every lookup.
 
-### 3.11 `src/core/input.js` / `engine.js`
+### 3.11 `src/view/core/input.js` / `engine.js`
 
 ```js
 new Input(canvasEl)   isDown(code) justPressed(code) mouseDown[0..2] mouseJustPressed(b)
@@ -350,7 +337,7 @@ when `source.kind === 'hero'`. XP goes to every enemy hero within 12 m of `unit.
 
 ## 5. `main.js` INTEGRATE hooks
 
-Search `src/main.js` for `// INTEGRATE:` — each names the object to construct and the
+Search `src/view/main.js` for `// INTEGRATE:` — each names the object to construct and the
 exact line it slots into. `window.__game` is set once with
 `{ engine, input, events, world, camera, controller, intent, map, hud, hero, step, three }`;
 `step(dt)` is the whole frame and is what the probe drives. `match.js` should add

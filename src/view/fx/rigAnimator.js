@@ -2,7 +2,7 @@
 // Reads unit state (velocity, attack wind-up, casting, stun, death) and blends each
 // rig's pose toward a target at 12 rad/s. Target poses are flat number arrays; every
 // mutable state lives on the rig object, so nothing here allocates per frame.
-import { events } from '../core/events.js';
+import { events } from '../../sim/core/events.js';
 
 const STRIDE = 1.15;          // metres per walk cycle
 const BLEND = 12;             // rad/s toward the target pose

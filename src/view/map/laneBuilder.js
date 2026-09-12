@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import {
   GROUND_BOUNDS, LANE_BOUNDS, WALL_BOXES, POSITIONS, TEAMS, TEAM_COLOR, FOUNTAIN_RADIUS,
-} from './laneData.js';
+} from '../../sim/map/laneData.js';
 import { makeGroundTexture, makeStoneTexture, makeDiscTexture } from './textures.js';
 
 export function buildLane(scene) {

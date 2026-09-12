@@ -2,7 +2,7 @@
 // portrait (silhouette per kit, trim colour per hero), name, role badge, passive and
 // the four abilities. Clicking a card picks the player hero; `?hero=` skips it.
 // Elements are built once here and never rebuilt.
-import { HEROES, HERO_KEYS } from '../hero/heroData.js';
+import { HEROES, HERO_KEYS } from '../../sim/hero/heroData.js';
 
 // Same trim palette as heroMesh.js, as canvas-friendly hex strings.
 const TRIM = {

@@ -5,27 +5,27 @@
 // only constructed once a hero is chosen.
 import * as THREE from 'three';
 import { Engine } from './core/engine.js';
-import { events } from './core/events.js';
+import { events } from '../sim/core/events.js';
 import { Input } from './core/input.js';
-import { World } from './core/world.js';
-import { makeIntent } from './hero/intent.js';
-import { HeroController } from './hero/heroController.js';
+import { World } from '../sim/core/world.js';
+import { makeIntent } from '../sim/hero/intent.js';
+import { HeroController } from './heroController.js';
 import { ThirdPersonCamera } from './camera/thirdPerson.js';
 import { buildLane } from './map/laneBuilder.js';
-import { LANE_BOUNDS, POSITIONS, TEAMS } from './map/laneData.js';
+import { LANE_BOUNDS, POSITIONS, TEAMS } from '../sim/map/laneData.js';
 import { Hud } from './hud/hud.js';
-import { Hero } from './hero/hero.js';
-import { HEROES, HERO_KEYS } from './hero/heroData.js';
-import { effects } from './hero/effects.js';
+import { Hero } from '../sim/hero/hero.js';
+import { HEROES, HERO_KEYS } from '../sim/hero/heroData.js';
+import { effects } from '../sim/hero/effects.js';
 import { AbilityBar } from './hud/abilityBar.js';
 import { HeroSelect } from './hud/heroSelect.js';
-import { Tower } from './units/tower.js';
-import { Nexus } from './units/nexus.js';
-import { WaveSpawner } from './units/waveSpawner.js';
-import { Economy } from './economy/gold.js';
-import { Shop } from './economy/shop.js';
-import { Consumables } from './economy/consumables.js';
-import { initPassives } from './economy/passives.js';
+import { Tower } from '../sim/units/tower.js';
+import { Nexus } from '../sim/units/nexus.js';
+import { WaveSpawner } from '../sim/units/waveSpawner.js';
+import { Economy } from '../sim/economy/gold.js';
+import { Shop } from '../sim/economy/shop.js';
+import { Consumables } from '../sim/economy/consumables.js';
+import { initPassives } from '../sim/economy/passives.js';
 import { ShopPanel } from './hud/shopPanel.js';
 import { DamageNumbers } from './hud/damageNumbers.js';
 import { UnitViews } from './fx/unitViews.js';
@@ -34,8 +34,8 @@ import { ShotViews } from './fx/shotViews.js';
 import { ParticleSystem } from './fx/particles.js';
 import { AbilityFx } from './fx/abilityFx.js';
 import { RigAnimator } from './fx/rigAnimator.js';
-import { HeroBot } from './ai/heroBot.js';
-import { Match } from './game/match.js';
+import { HeroBot } from '../sim/ai/heroBot.js';
+import { Match } from '../sim/game/match.js';
 
 // `?hero=` / `?enemy=`: a validated key, or null when absent/unknown.
 function paramHero(name) {
@@ -173,6 +173,7 @@ function startMatch(playerKey, enemyKey, base) {
 
   const match = new Match({
     world, scene, input, hero, enemy, controller, bot, waves, shop, gold, effects,
+    banner: document.getElementById('match-banner'),
     towers, nexuses, camera, hud, abilityBar, shopPanel, consumables, passives, fx,
   });
 

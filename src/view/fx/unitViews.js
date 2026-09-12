@@ -3,9 +3,9 @@
 // pool reuse and match resets, and fills the unit's view-owned `mesh` / `rig` slots
 // that the camera-side systems (RigAnimator, AbilityFx, HUD) read. Nothing here writes
 // sim state.
-import { events } from '../core/events.js';
+import { events } from '../../sim/core/events.js';
 import { buildHeroRig, buildMinionRig } from './rig.js';
-import { makeTowerMesh, makeNexusMesh } from '../units/unitMeshes.js';
+import { makeTowerMesh, makeNexusMesh } from './unitMeshes.js';
 
 const STEALTH_OPACITY = 0.35;
 

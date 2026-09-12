@@ -2,8 +2,8 @@
 // sim's 'shotFired' (a launch point and a target unit) and flies a small sphere to the
 // target's body height; 'shotsCleared' hides everything on match reset. Purely visual:
 // damage already landed when the shot was fired.
-import { events } from '../core/events.js';
-import { makeShotMesh, shotMaterial, hitHeight } from '../units/unitMeshes.js';
+import { events } from '../../sim/core/events.js';
+import { makeShotMesh, shotMaterial, hitHeight } from './unitMeshes.js';
 
 const POOL_SIZE = 48;
 

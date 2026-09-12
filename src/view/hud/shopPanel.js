@@ -2,7 +2,7 @@
 // the fountain; P opens the full panel (pointer lock released so items are clickable),
 // P / close / clicking back into the game re-locks. Four tabs (Consumables / Tier 1-3).
 // Built once, updated in place, every DOM lookup guarded. Buying goes through Shop.buy.
-import { ITEMS, INVENTORY_SLOTS, SELL_RATIO } from '../economy/items.js';
+import { ITEMS, INVENTORY_SLOTS, SELL_RATIO } from '../../sim/economy/items.js';
 
 const REASON_TEXT = {
   ok: '', unknown: '', dead: 'Dead', fountain: 'Leave fountain to close',

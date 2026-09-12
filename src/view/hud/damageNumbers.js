@@ -2,7 +2,7 @@
 // each frame, rising and fading over 0.8 s. Built once in the constructor; updates
 // touch only transform/opacity. Colour by damage type, larger for hero hits.
 import * as THREE from 'three';
-import { events } from '../core/events.js';
+import { events } from '../../sim/core/events.js';
 
 const POOL = 32;
 const LIFE = 0.8;

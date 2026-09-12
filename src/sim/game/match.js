@@ -24,17 +24,20 @@ export class Match {
     this.countdown = COUNTDOWN;
     this.winner = null;
     this.overAge = 0;
-    this.banner = document.getElementById('match-banner');
+    // Presentation objects are optional: headless (Node/server) runs pass none.
+    this.banner = g.banner || null;
     this._bannerText = null;
     this._showBanner('READY');
     this._offs = [
       events.on('nexusDestroyed', (p) => this.end(enemyOf(p.team))),
-      events.on('heroRespawned', (p) => { if (p.hero === this.hero) this.camera.snapTo(this.hero.pos); }),
-      events.on('recallEnded', (p) => { if (p.hero === this.hero && p.completed) this.camera.snapTo(this.hero.pos); }),
+      events.on('heroRespawned', (p) => { if (p.hero === this.hero) this._snap(); }),
+      events.on('recallEnded', (p) => { if (p.hero === this.hero && p.completed) this._snap(); }),
     ];
   }
 
   get time() { return this.world.time; }
+
+  _snap() { if (this.camera) this.camera.snapTo(this.hero.pos); }
 
   // One whole frame. What window.__game.step(dt) and the engine loop call.
   update(dt) {
@@ -46,7 +49,7 @@ export class Match {
   // Not simulating (overlay up, shop open): keep camera/HUD/shop responsive.
   idle(dt) {
     this._present(dt);
-    this.input.endFrame();
+    if (this.input) this.input.endFrame();
   }
 
   _live(dt) {
@@ -61,7 +64,7 @@ export class Match {
     this.world.update(dt);
     this.effects.update(dt);
     this._present(dt);
-    this.input.endFrame();
+    if (this.input) this.input.endFrame();
   }
 
   _countdown(dt) {
@@ -69,25 +72,26 @@ export class Match {
     this._showBanner(this.countdown > 0 ? String(Math.ceil(this.countdown)) : 'FIGHT');
     if (this.countdown <= 0) this.skipCountdown();
     this._present(dt);
-    this.input.endFrame();
+    if (this.input) this.input.endFrame();
   }
 
   _over(dt) {
     this.overAge += dt;
     clearIntent(this.hero.intent);
     clearIntent(this.enemy.intent);
-    if (this.overAge >= RESTART_GRACE && (this.input.justPressed('Enter') || this.input.mouseJustPressed(0))) {
+    const inp = this.input;
+    if (this.overAge >= RESTART_GRACE && inp && (inp.justPressed('Enter') || inp.mouseJustPressed(0))) {
       this.reset();
     }
     this._present(dt);
-    this.input.endFrame();
+    if (this.input) this.input.endFrame();
   }
 
   _present(dt) {
-    this.camera.update(dt, this.hero.pos);
-    this.hud.update(this.hero, this.world.time);
-    this.abilityBar.update();
-    this.shopPanel.update(dt);
+    if (this.camera) this.camera.update(dt, this.hero.pos);
+    if (this.hud) this.hud.update(this.hero, this.world.time);
+    if (this.abilityBar) this.abilityBar.update();
+    if (this.shopPanel) this.shopPanel.update(dt);
     if (this.fx) this.fx.update(dt);   // particles/trails/numbers use the fresh camera
   }
 
@@ -143,11 +147,11 @@ export class Match {
     if (this.passives) this.passives.reset(this.world);
     if (this.bot) this.bot.reset();
     if (this.fx) this.fx.reset();
-    this.abilityBar.invalidate();
-    this.hud.invalidate();
+    if (this.abilityBar) this.abilityBar.invalidate();
+    if (this.hud) this.hud.invalidate();
     clearIntent(this.hero.intent);
     clearIntent(this.enemy.intent);
-    this.camera.snapTo(this.hero.pos);
+    this._snap();
     this.state = 'countdown';
     this.countdown = COUNTDOWN;
     this.winner = null;

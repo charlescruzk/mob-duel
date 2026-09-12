@@ -2,7 +2,7 @@
 // index-aligned with `effects` (same sizes, built once); update() mirrors every
 // record into its mesh. The sim never sees these objects.
 import * as THREE from 'three';
-import { PROJECTILE_POOL, RING_POOL, ZONE_POOL } from '../hero/effects.js';
+import { PROJECTILE_POOL, RING_POOL, ZONE_POOL } from '../../sim/hero/effects.js';
 
 const ZONE_Y = 0.04;
 

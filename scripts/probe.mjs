@@ -10,12 +10,14 @@
 import { spawn } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { existsSync, readdirSync } from 'node:fs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const PORT = 8090;
-const CDP = 9343;
+// Ports are overridable so several probes (parallel worktrees) can run at once.
+const PORT = Number(process.env.PROBE_PORT || 8090);
+const CDP = Number(process.env.PROBE_CDP || 9343);
 const URL_BASE = `http://127.0.0.1:${PORT}/index.html`;
 // The first load runs a normal match (?hero=brakk); the hero-select block navigates
 // to the bare page, where the match is only built once a card is clicked. lowfx
@@ -292,7 +294,7 @@ async function main() {
 
   await block('minions, last-hit gold, tower rules, nexus, match end, rematch', `(async () => {
     ${SETUP}
-    const Minion = (await import('/src/units/minion.js')).Minion;
+    const Minion = (await import('/src/sim/units/minion.js')).Minion;
     H.teleport(0, 37); E.teleport(0, -37);
     // First wave at 15 s, five per side released over the stagger.
     r.noMinionsBefore15 = (step(14.5), g.waves.aliveCount('blue') === 0);
@@ -379,7 +381,7 @@ async function main() {
   await block('status: minion CC and hero root/stealth/attackSpeed/armorBuff/reflect/bonus', `(async () => {
     try {
     ${SETUP}
-    const Minion = (await import('/src/units/minion.js')).Minion;
+    const Minion = (await import('/src/sim/units/minion.js')).Minion;
     const I = H.intent;
     H.teleport(0, 37); E.teleport(0, -37);
     // A lone blue minion walks the lane at 3.2 m/s; CC changes that distance in 1 s.
@@ -541,8 +543,8 @@ async function main() {
   await block('items: passives — burn, cleave, rend, flow, spell shield, tempo, execute, undertow, second wind', `(async () => {
     try {
     ${SETUP}
-    const P = await import('/src/economy/passives.js');
-    const Minion = (await import('/src/units/minion.js')).Minion;
+    const P = await import('/src/sim/economy/passives.js');
+    const Minion = (await import('/src/sim/units/minion.js')).Minion;
     const I = H.intent;
     H.gold = 99999;
     // Lone rooted minions at mid-lane keep position maths exact.
@@ -641,7 +643,7 @@ async function main() {
     try {
     ${SETUP}
     const I = H.intent;
-    const Minion = (await import('/src/units/minion.js')).Minion;
+    const Minion = (await import('/src/sim/units/minion.js')).Minion;
     const spawn = (x, z) => {
       const mn = W.add(new Minion('red', W, { x: x, y: 0, z: z }, { ranged: false, wave: 0 }));
       mn.applyStatus('root', 30, 1);
@@ -721,7 +723,7 @@ async function main() {
     try {
     ${SETUP}
     const I = H.intent;
-    const Minion = (await import('/src/units/minion.js')).Minion;
+    const Minion = (await import('/src/sim/units/minion.js')).Minion;
     const spawn = (x, z) => {
       const mn = W.add(new Minion('red', W, { x: x, y: 0, z: z }, { ranged: false, wave: 0 }));
       mn.applyStatus('root', 30, 1);
@@ -1290,6 +1292,24 @@ async function main() {
     return r;
     } catch (e) { return { error: String((e && e.stack) || e) }; }
   })()`);
+
+  // Pluggable blocks: every scripts/probes/*.mjs exports `default async (ctx) => {}`
+  // and adds its own assertions through ctx.block (page-side) or ctx.report (Node-side).
+  // Feature work adds a file there instead of editing this one.
+  const report = (title, obj) => {
+    console.log(`\n=== BEHAVIOR (${title}) ===`);
+    console.log(obj);
+    for (const [k, val] of Object.entries(obj)) if (val === false) { exitCode = 1; console.log(`  ✗ ${k}`); }
+  };
+  const probesDir = join(ROOT, 'scripts', 'probes');
+  if (existsSync(probesDir)) {
+    const files = readdirSync(probesDir).filter((n) => n.endsWith('.mjs')).sort();
+    for (const f of files) {
+      const mod = await import(pathToFileURL(join(probesDir, f)).href);
+      try { await mod.default({ block, report, restart, send, sleep, SETUP, URL_BASE, ROOT }); }
+      catch (e) { exitCode = 1; console.log(`PROBE PLUGIN ERROR (${f}): ` + (e?.stack || e)); }
+    }
+  }
 
   ws.close();
   try { server.kill('SIGKILL'); } catch { /* gone */ }

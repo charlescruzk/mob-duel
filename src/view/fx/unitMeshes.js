@@ -3,9 +3,9 @@
 // ever disposed, and nothing here runs per frame. Every mesh is a Group whose visual
 // offsets live on children, so Unit.syncMesh can drive the group directly.
 import * as THREE from 'three';
-import { TEAM_COLOR, RADII, HEIGHTS } from '../map/laneData.js';
+import { TEAM_COLOR, RADII, HEIGHTS } from '../../sim/map/laneData.js';
 import { toonMat, addOutline } from '../map/materials.js';
-import { buildMinionRig } from '../fx/rig.js';
+import { buildMinionRig } from './rig.js';
 
 const SQRT2 = Math.SQRT2;
 

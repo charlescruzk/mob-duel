@@ -1,6 +1,6 @@
 // The lane as plain data (DESIGN.md §2). Single source of truth for every position
 // and radius other modules need. Vector3 so `pos.copy(...)` works directly.
-import * as THREE from 'three';
+import { Vec3 } from '../core/vec.js';
 
 export const TEAMS = ['blue', 'red'];
 export const TEAM_COLOR = { blue: 0x3b6fd6, red: 0xd64a3b };
@@ -24,17 +24,17 @@ export const TOWER_RANGE = 10.0;
 export const POSITIONS = {
   blue: {
     dir: -1,
-    nexus: new THREE.Vector3(0, 0, 42),
-    tower: new THREE.Vector3(3.0, 0, 16),
-    minionSpawn: new THREE.Vector3(-1.5, 0, 38.5),
-    heroSpawn: new THREE.Vector3(0, 0, 37),
+    nexus: new Vec3(0, 0, 42),
+    tower: new Vec3(3.0, 0, 16),
+    minionSpawn: new Vec3(-1.5, 0, 38.5),
+    heroSpawn: new Vec3(0, 0, 37),
   },
   red: {
     dir: 1,
-    nexus: new THREE.Vector3(0, 0, -42),
-    tower: new THREE.Vector3(3.0, 0, -16),
-    minionSpawn: new THREE.Vector3(-1.5, 0, -38.5),
-    heroSpawn: new THREE.Vector3(0, 0, -37),
+    nexus: new Vec3(0, 0, -42),
+    tower: new Vec3(3.0, 0, -16),
+    minionSpawn: new Vec3(-1.5, 0, -38.5),
+    heroSpawn: new Vec3(0, 0, -37),
   },
 };
 
@@ -51,11 +51,11 @@ const WALL_Z = [-39, -26, -13, 0, 13, 26, 39];
 export const WALL_BOXES = [];
 for (let i = 0; i < WALL_Z.length; i++) {
   const z = WALL_Z[i];
-  WALL_BOXES.push({ min: new THREE.Vector3(7.5, 0, z - 5.5), max: new THREE.Vector3(17.5, 3, z + 5.5) });
-  WALL_BOXES.push({ min: new THREE.Vector3(-17.5, 0, z - 5.5), max: new THREE.Vector3(-7.5, 3, z + 5.5) });
+  WALL_BOXES.push({ min: new Vec3(7.5, 0, z - 5.5), max: new Vec3(17.5, 3, z + 5.5) });
+  WALL_BOXES.push({ min: new Vec3(-17.5, 0, z - 5.5), max: new Vec3(-7.5, 3, z + 5.5) });
 }
-WALL_BOXES.push({ min: new THREE.Vector3(-24, 0, 45), max: new THREE.Vector3(24, 3, 49) });
-WALL_BOXES.push({ min: new THREE.Vector3(-24, 0, -49), max: new THREE.Vector3(24, 3, -45) });
+WALL_BOXES.push({ min: new Vec3(-24, 0, 45), max: new Vec3(24, 3, 49) });
+WALL_BOXES.push({ min: new Vec3(-24, 0, -49), max: new Vec3(24, 3, -45) });
 
 export function isInFountain(pos, team) {
   const n = POSITIONS[team].nexus;

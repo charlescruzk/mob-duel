@@ -3,8 +3,8 @@
 // — minion materials are shared per team, so emissive flashes would light them all)
 // and the camera kick on R casts and own death. Listens; never mutates sim state.
 import * as THREE from 'three';
-import { events } from '../core/events.js';
-import { TEAM_COLOR } from '../map/laneData.js';
+import { events } from '../../sim/core/events.js';
+import { TEAM_COLOR } from '../../sim/map/laneData.js';
 
 const TRAIL_COLOR = new THREE.Color();   // scratch: projectile records carry a hex
 

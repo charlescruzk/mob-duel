@@ -6,7 +6,7 @@
 // Lives in fx/ but is imported by the mesh builders (hero/ , units/) — they are
 // visual-only code already importing map/; the sim never imports fx/.
 import * as THREE from 'three';
-import { RADII, TEAM_COLOR } from '../map/laneData.js';
+import { RADII, TEAM_COLOR } from '../../sim/map/laneData.js';
 import { toonMat, addOutline } from '../map/materials.js';
 
 const TRIM = { brakk: 0x6b6b6b, ilyra: 0xf2c84b, vaskra: 0x9fd6ff, kesh: 0xb06be0, halvard: 0x8a9aa8, lumen: 0x2fa8c8 };

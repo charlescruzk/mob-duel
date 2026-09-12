@@ -2,7 +2,7 @@
 // a cooldown sweep + number, greyed when locked / cooling / unaffordable / busy.
 // Built once in the constructor (including its own <style>), updated in place, and
 // every DOM lookup is guarded so a missing root degrades to a no-op.
-import { SLOTS, R_UNLOCK_LEVEL } from '../hero/heroData.js';
+import { SLOTS, R_UNLOCK_LEVEL } from '../../sim/hero/heroData.js';
 
 const KEY_HINT = { p: 'P', q: 'Q', w: 'F', e: 'E', r: 'R' };
 const STATES = ['locked', 'cooldown', 'mana', 'busy'];
