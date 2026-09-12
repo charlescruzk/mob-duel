@@ -9,6 +9,8 @@ export class GameAudio {
     this.volume = 0.8;
   }
   unlock() { /* create/resume the AudioContext on first gesture */ }
+  // Called by main.js once the match exists: footsteps and proximity need units.
+  attach(world, hero, enemy) {}
   setMuted(m) { this.muted = !!m; }
   setVolume(v) { this.volume = v; }
   update(dt) { /* ambience/music scheduling */ }

@@ -8,6 +8,8 @@ export class TouchControls {
     this.canvas = canvas;
     this.active = false;       // true once a touch source is driving the game
   }
+  // Called by main.js once the match exists: assisted aim needs the world and hero.
+  attach(world, camera, hero, controller) {}
   update(dt) {}
   reset() {}
   dispose() {}

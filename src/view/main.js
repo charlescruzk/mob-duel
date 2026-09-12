@@ -182,6 +182,9 @@ function startMatch(playerKey, enemyKey, base) {
     reset() { particles.reset(); abilityFx.reset(); damageNumbers.reset(); hitStop.reset(); audio.reset(); touch.reset(); },
   };
 
+  touch.attach(world, camera, hero, controller);
+  audio.attach(world, hero, enemy);
+
   const match = new Match({
     world, scene, input, hero, enemy, controller, bot, waves, shop, gold, effects,
     banner: document.getElementById('match-banner'),

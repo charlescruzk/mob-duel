@@ -28,7 +28,10 @@ export class Engine {
 
     // Rendering look (shadows, tone mapping, sky, fog, bloom). `?lowfx` strips the
     // shadow map and the composer — the headless probe always passes it.
-    const lowfx = new URLSearchParams(location.search).has('lowfx');
+    const q = new URLSearchParams(location.search);
+    // Phones default to the low tier (PHASE3.md §6); `?hifx` forces the full look.
+    const phone = (navigator.maxTouchPoints || 0) > 0 && Math.min(screen.width, screen.height) < 900;
+    const lowfx = q.has('lowfx') || (phone && !q.has('hifx'));
     this.look = new Look(this, lowfx);
 
     // Called with the thrown error if the frame callback throws; the loop stops so the
