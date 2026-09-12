@@ -5,7 +5,6 @@
 import { Unit } from '../core/unit.js';
 import { inRangeXZ, distSqXZ } from '../core/physics.js';
 import { POSITIONS, RADII, enemyOf } from '../map/laneData.js';
-import { makeMinionMesh } from './unitMeshes.js';
 import { shots } from './shotPool.js';
 
 const STATS = {
@@ -29,7 +28,7 @@ function priorityOf(u) {
 
 export class Minion extends Unit {
   // opts: { ranged: false, wave: 0 }. pos is copied. Caller does world.add(minion).
-  constructor(team, world, scene, pos, opts) {
+  constructor(team, world, pos, opts) {
     const ranged = !!(opts && opts.ranged);
     const wave = opts && opts.wave ? opts.wave : 0;
     const s = ranged ? STATS.ranged : STATS.melee;
@@ -53,13 +52,10 @@ export class Minion extends Unit {
     this.stunTimer = 0;
     this.slowTimer = 0; this.slowPct = 0;
     this.rootTimer = 0;
-    this.mesh = makeMinionMesh(team, ranged);
-    if (scene) scene.add(this.mesh);
-    shots.attach(scene);
     this.reset(pos, wave);
   }
 
-  // (Re)spawn at pos for wave index `wave`: stats rescale, HP refills, mesh reappears.
+  // (Re)spawn at pos for wave index `wave`: stats rescale, HP refills.
   reset(pos, wave) {
     const s = this.stats;
     this.wave = wave;

@@ -14,7 +14,6 @@ import { BasicAttack } from './heroAttack.js';
 import { applyItemTo, refreshItemStats, ITEM_KEYS } from './heroItems.js';
 import { recomputeStats, refreshArmor } from './heroStats.js';
 import { knockTick, knockClear } from './heroKnock.js';
-import { buildHeroMesh, applyStealthFade } from './heroMesh.js';
 import * as recall from './heroRecall.js';
 import { effects } from './effects.js';
 
@@ -28,7 +27,7 @@ const respawnPayload = { hero: null };
 const diedPayload = { hero: null, source: null };
 
 export class Hero extends Unit {
-  constructor(heroKey, team, world, scene) {
+  constructor(heroKey, team, world) {
     const data = HEROES[heroKey];
     if (!data) throw new Error('unknown hero: ' + heroKey);
     super('hero', team, RADII.hero, atLevel(data.hp, 1), atLevel(data.armor, 1));
@@ -64,17 +63,9 @@ export class Hero extends Unit {
     this.recomputeStats();
     this.hp = this.maxHp; this.mp = this.maxMp;
 
-    const built = buildHeroMesh(heroKey, team);
-    this.mesh = built.group;
-    this.shieldMesh = built.shield;
-    this.meshMats = built.mats || [];      // faded to 0.35 while stealthed
-    this.rig = built.rig || null;          // joint table the RigAnimator drives
-    this._stealthMeshOn = false;
-    if (scene) scene.add(this.mesh);
     this.pos.copy(POSITIONS[team].heroSpawn);
     this.facing = team === 'blue' ? 0 : Math.PI;
-    this.syncMesh();
-    effects.attach(scene, world);
+    effects.attach(world);
     this._onUnitDied = (p) => this._handleUnitDied(p.unit, p.source);
     this._onAbilityHit = (p) => this._handleAbilityHit(p);
     this._unsub = events.on('unitDied', this._onUnitDied);
@@ -130,12 +121,6 @@ export class Hero extends Unit {
       if (!sys.dash.active && (intent.attack || this.attack.active || sys.isCasting)) {
         this.facing = Math.atan2(-(ax - this.pos.x), -(az - this.pos.z));
       }
-    }
-    if (this.shieldMesh) this.shieldMesh.visible = this.shield > 0;
-    const stealthOn = this.abilities.stealthed;
-    if (stealthOn !== this._stealthMeshOn) {
-      this._stealthMeshOn = stealthOn;
-      applyStealthFade(this);
     }
   }
 
@@ -202,7 +187,6 @@ export class Hero extends Unit {
     knockClear(this);
     this.abilities.clearStatus();
     this.attack.reset();
-    if (this.shieldMesh) this.shieldMesh.visible = false;
     super.die(source);
     diedPayload.hero = this; diedPayload.source = source;
     events.emit('heroDied', diedPayload);
@@ -297,7 +281,6 @@ export class Hero extends Unit {
   dispose() {
     if (this._unsub) { this._unsub(); this._unsub = null; }
     if (this._unsubAbilityHit) { this._unsubAbilityHit(); this._unsubAbilityHit = null; }
-    if (this.mesh && this.mesh.parent) this.mesh.parent.remove(this.mesh);
   }
 }
 

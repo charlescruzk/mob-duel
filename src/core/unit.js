@@ -1,7 +1,7 @@
 // Unit — the base class of every hero, minion, tower and nexus. Holds the fields the
 // world, physics, HUD and bot read, and the one damage entry point. Subclasses set
 // stats in their constructor and override update(dt).
-import * as THREE from 'three';
+import { Vec3 } from './vec.js';
 import { events } from './events.js';
 
 let nextId = 1;
@@ -17,9 +17,9 @@ export class Unit {
     this.id = nextId++;
     this.kind = kind;
     this.team = team;
-    this.pos = new THREE.Vector3();
-    this.prevPos = new THREE.Vector3();
-    this.vel = new THREE.Vector3();      // written by World.update; read by the bot for aim lead
+    this.pos = new Vec3();
+    this.prevPos = new Vec3();
+    this.vel = new Vec3();      // written by World.update; read by the bot for aim lead
     this.facing = 0;                     // yaw in radians; 0 faces -Z (Three.js forward)
     this.radius = radius;
     this.maxHp = maxHp;
@@ -31,7 +31,8 @@ export class Unit {
     this.isStatic = false;               // tower/nexus: never pushed by separation
     this.noCollide = false;              // skip circle separation entirely (dead/ghost)
     this.moveSpeed = 0;
-    this.mesh = null;
+    this.mesh = null;                    // view-owned slot, filled by fx/unitViews.js
+    this.rig = null;                     // view-owned joint table (fx/rig.js)
     this.world = null;                   // set by World.add
   }
 
@@ -82,9 +83,6 @@ export class Unit {
     this.hp = 0;
     this.shield = 0;
     this.vel.set(0, 0, 0);
-    // Rigged units (heroes, minions) keep the mesh up for the death fall/sink — the
-    // animator hides it once sunk; unrigged structures hide instantly.
-    if (this.mesh) this.mesh.visible = !!this.rig;
     diedPayload.unit = this;
     diedPayload.source = source;
     events.emit('unitDied', diedPayload);
@@ -97,7 +95,6 @@ export class Unit {
     this.shield = 0;
     this.prevPos.copy(this.pos);
     this.vel.set(0, 0, 0);
-    if (this.mesh) this.mesh.visible = true;
   }
 
   // Move instantly (recall, respawn, blink) without a one-frame velocity spike.
@@ -109,6 +106,7 @@ export class Unit {
 
   update(dt) { /* subclasses override; called only while alive */ }
 
+  // Mirrors pos/facing into the view's mesh when one is attached (no-op headless).
   syncMesh() {
     if (!this.mesh) return;
     this.mesh.position.copy(this.pos);

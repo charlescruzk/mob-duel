@@ -2,8 +2,11 @@
 // the sim's event stream into particles. Also owns the hit flash (0.1 s 8 % scale pop
 // — minion materials are shared per team, so emissive flashes would light them all)
 // and the camera kick on R casts and own death. Listens; never mutates sim state.
+import * as THREE from 'three';
 import { events } from '../core/events.js';
 import { TEAM_COLOR } from '../map/laneData.js';
+
+const TRAIL_COLOR = new THREE.Color();   // scratch: projectile records carry a hex
 
 // Emitter recipes per ability. b = burst(x,y,z,hex,count,speed,up,life,size),
 // r = ring(x,z,hex,count,radius,speed,life,size), c = column(x,z,hex,count,height,life,size).
@@ -181,7 +184,7 @@ export class AbilityFx {
       const trail = this.particles.trailRgb;
       for (let i = 0; i < list.length; i++) {
         const p = list[i];
-        if (p.active) trail.call(this.particles, p.pos.x, p.pos.y, p.pos.z, p.mesh.material.color, 0.13);
+        if (p.active) trail.call(this.particles, p.pos.x, p.pos.y, p.pos.z, TRAIL_COLOR.setHex(p.color), 0.13);
       }
     }
   }

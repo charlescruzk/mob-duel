@@ -6,7 +6,6 @@ import { Unit } from '../core/unit.js';
 import { events } from '../core/events.js';
 import { distSqXZ } from '../core/physics.js';
 import { RADII, HEIGHTS, TOWER_RANGE } from '../map/laneData.js';
-import { makeTowerMesh } from './unitMeshes.js';
 import { shots } from './shotPool.js';
 
 const HP = 1800;
@@ -28,7 +27,7 @@ const shotPayload = { tower: null, target: null, amount: 0, ramp: 1 };
 
 export class Tower extends Unit {
   // pos is copied. Caller does world.add(tower).
-  constructor(team, world, scene, pos) {
+  constructor(team, world, pos) {
     super('tower', team, RADII.tower, HP, 0);
     this.isStatic = true;
     this.world = world;                  // World.add overwrites with the same value
@@ -45,10 +44,6 @@ export class Tower extends Unit {
     this._lastHeroShot = -1e9;
     this.pos.copy(pos);
     this.pos.y = 0;
-    this.mesh = makeTowerMesh(team);
-    if (scene) scene.add(this.mesh);
-    shots.attach(scene);
-    this.syncMesh();
     this._onDamaged = (p) => this._handleDamaged(p);
     this._unsub = events.on('unitDamaged', this._onDamaged);
   }

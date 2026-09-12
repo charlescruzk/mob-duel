@@ -25,17 +25,14 @@ const wavePayload = { team: 'blue', index: 0 };
 const spawnPos = { x: 0, y: 0, z: 0 };
 
 export class WaveSpawner {
-  // Third argument (laneData) is accepted and ignored: positions come from laneData.js.
-  constructor(world, scene) {
+  constructor(world) {
     this.world = world;
-    this.scene = scene;
     this.pool = [];
     this.waveIndex = 0;          // next wave to release (DESIGN.md `w`, starts at 0)
     this.nextWaveTime = FIRST_WAVE;
     this.waveStart = -1;         // release time of the wave currently staggering out
     this.releasing = false;
     this.released = [0, 0];      // per TEAMS index, 0..PER_TEAM of the current wave
-    shots.attach(scene);
   }
 
   // matchTime is optional; world.time is the default clock.
@@ -85,7 +82,7 @@ export class WaveSpawner {
       if (!m.world) this.world.add(m);
       return m;
     }
-    const fresh = new Minion(team, this.world, this.scene, spawnPos, { ranged: slot.ranged, wave });
+    const fresh = new Minion(team, this.world, spawnPos, { ranged: slot.ranged, wave });
     this.world.add(fresh);
     this.pool.push(fresh);
     return fresh;
@@ -109,7 +106,7 @@ export class WaveSpawner {
     return n;
   }
 
-  // Full match reset: every pooled minion leaves the world and the scene; the clock
+  // Full match reset: every pooled minion leaves the world; the clock
   // restarts at the first wave. Safe to call before or after world.clear().
   reset() {
     const pool = this.pool;
@@ -118,9 +115,7 @@ export class WaveSpawner {
       m.alive = false;
       m.hp = 0;
       m.target = null;
-      if (m.mesh) m.mesh.visible = false;
       if (m.world) m.world.remove(m);
-      else if (m.mesh && m.mesh.parent) m.mesh.parent.remove(m.mesh);
     }
     pool.length = 0;
     this.waveIndex = 0;

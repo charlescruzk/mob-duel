@@ -1,23 +1,20 @@
-// Effects — pooled projectiles, short-lived rings and ground zones. One shared
-// instance (`effects`) that a Hero attaches to the scene/world on construction;
-// main/match calls `effects.update(dt)` after world.update(dt). Pools are built
-// once; spawning after that allocates nothing. Projectiles carry their owner's
-// onHit(projectile, unit) callback (bind it ONCE in the owner's constructor —
-// never a fresh closure per cast).
-import * as THREE from 'three';
+// Effects — pooled projectiles, short-lived rings and ground zones, sim side. No
+// three.js: every record is plain numbers that fx/effectViews.js mirrors into meshes.
+// Pools are built once in the constructor; spawning after that allocates nothing.
+// Projectiles carry their owner's onHit(projectile, unit) callback (bind it ONCE in
+// the owner's constructor — never a fresh closure per cast).
+import { Vec3 } from '../core/vec.js';
 
-const PROJECTILE_POOL = 48;
-const RING_POOL = 24;
-const ZONE_POOL = 4;
-const ZONE_Y = 0.04;
+export const PROJECTILE_POOL = 48;
+export const RING_POOL = 24;
+export const ZONE_POOL = 8;
 const SUBSTEP = 0.3;            // m per swept sub-step so a 30 m/s lance cannot skip a minion
 const PROJECTILE_Y = 1.0;
 
 class Projectile {
-  constructor(mesh) {
+  constructor() {
     this.active = false;
-    this.mesh = mesh;
-    this.pos = new THREE.Vector3();
+    this.pos = new Vec3();
     this.dx = 0; this.dz = 0;
     this.speed = 0;
     this.radius = 0.5;
@@ -27,89 +24,45 @@ class Projectile {
     this.owner = null;          // free-form: the caller's unit
     this.target = null;         // homing when set; cannot miss; vanishes if the target dies
     this.pierce = false;
-    this.heroesOnly = false;    // Deadeye: minions never block or trigger the hit
-    this.execScale = false;     // recompute damage from missing HP at impact
+    this.heroesOnly = false;
+    this.execScale = false;
     this.slot = '';             // caller tag ('auto' | 'q' | 'r' ...)
     this.damage = 0;
     this.dtype = 'physical';
+    this.color = 0xffffff;      // view hint only
     this.hits = [];             // pierce bookkeeping: units already struck
   }
 }
 
-class Ring {
-  constructor(mesh) {
+// Rings and zones share a shape: a disc at (x, z) whose `alpha` fades with life.
+class Disc {
+  constructor(baseAlpha) {
     this.active = false;
-    this.mesh = mesh;
+    this.x = 0; this.z = 0;
+    this.radius = 1;
     this.life = 0;
     this.maxLife = 0;
-  }
-}
-
-// A ground zone's visible disc (Earthbreaker's slow field, Deluge). Lifetime and
-// position live on the sim side (AbilitySystem.zone); the mesh only fades.
-class Zone {
-  constructor(mesh) {
-    this.active = false;
-    this.mesh = mesh;
-    this.life = 0;
-    this.maxLife = 0;
+    this.color = 0xffffff;
+    this.baseAlpha = baseAlpha;
+    this.alpha = 0;
   }
 }
 
 export class Effects {
   constructor() {
-    this.scene = null;
     this.world = null;
-    this.group = new THREE.Group();
     this.projectiles = [];
     this.rings = [];
     this.zones = [];
-    this._built = false;
+    for (let i = 0; i < PROJECTILE_POOL; i++) this.projectiles.push(new Projectile());
+    for (let i = 0; i < RING_POOL; i++) this.rings.push(new Disc(0.8));
+    for (let i = 0; i < ZONE_POOL; i++) this.zones.push(new Disc(0.3));
   }
 
-  // Idempotent. Re-attaching to another scene moves the group.
-  attach(scene, world) {
+  // Idempotent. The world is what projectiles sweep against.
+  attach(world) {
     if (world) this.world = world;
-    if (scene && scene !== this.scene) {
-      if (this.scene) this.scene.remove(this.group);
-      scene.add(this.group);
-      this.scene = scene;
-    }
-    if (!this._built) this._build();
     return this;
-  }
-
-  _build() {
-    this._built = true;
-    const sphere = new THREE.SphereGeometry(1, 10, 8);
-    for (let i = 0; i < PROJECTILE_POOL; i++) {
-      const m = new THREE.Mesh(sphere, new THREE.MeshBasicMaterial({ color: 0xffffff }));
-      m.visible = false;
-      this.group.add(m);
-      this.projectiles.push(new Projectile(m));
-    }
-    const ring = new THREE.RingGeometry(0.82, 1.0, 40);
-    for (let i = 0; i < RING_POOL; i++) {
-      const m = new THREE.Mesh(ring, new THREE.MeshBasicMaterial({
-        color: 0xffffff, transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false,
-      }));
-      m.rotation.x = -Math.PI / 2;
-      m.position.y = 0.05;
-      m.visible = false;
-      this.group.add(m);
-      this.rings.push(new Ring(m));
-    }
-    const disc = new THREE.CircleGeometry(1, 32);
-    for (let i = 0; i < ZONE_POOL; i++) {
-      const m = new THREE.Mesh(disc, new THREE.MeshBasicMaterial({
-        color: 0xffffff, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false,
-      }));
-      m.rotation.x = -Math.PI / 2;
-      m.position.y = ZONE_Y;
-      m.visible = false;
-      this.group.add(m);
-      this.zones.push(new Zone(m));
-    }
   }
 
   // from: {x,z}; dir: {x,z} (normalised by the caller); onHit(projectile, unit) is
@@ -135,47 +88,33 @@ export class Effects {
     p.slot = '';
     p.damage = 0;
     p.dtype = 'physical';
+    p.color = color;
     p.hits.length = 0;
-    p.mesh.visible = true;
-    p.mesh.scale.setScalar(radius);
-    p.mesh.material.color.setHex(color);
-    p.mesh.position.copy(p.pos);
     return p;
   }
 
   spawnRing(pos, radius, life, color = 0xffffff) {
-    let r = null;
-    for (let i = 0; i < this.rings.length; i++) if (!this.rings[i].active) { r = this.rings[i]; break; }
-    if (!r) return null;
-    r.active = true;
-    r.life = life;
-    r.maxLife = life;
-    r.mesh.visible = true;
-    r.mesh.scale.set(radius, radius, 1);
-    r.mesh.position.x = pos.x;
-    r.mesh.position.z = pos.z;
-    r.mesh.material.color.setHex(color);
-    r.mesh.material.opacity = 0.8;
-    return r;
+    return this._spawnDisc(this.rings, pos, radius, life, color);
   }
 
   // Ground zone disc. The sim's zone timer is authoritative (startZone/endZone in
-  // abilityLibExt.js); `life` here only drives the fade, and the returned Zone is
-  // kept by the caller so it can end the disc early.
+  // abilityLibExt.js); `life` here only drives the fade, and the returned record is
+  // kept by the caller so it can end the disc early (active = false).
   spawnZone(pos, radius, life, color = 0xffffff) {
-    let z = null;
-    for (let i = 0; i < this.zones.length; i++) if (!this.zones[i].active) { z = this.zones[i]; break; }
-    if (!z) return null;
-    z.active = true;
-    z.life = life;
-    z.maxLife = life;
-    z.mesh.visible = true;
-    z.mesh.scale.set(radius, radius, 1);
-    z.mesh.position.x = pos.x;
-    z.mesh.position.z = pos.z;
-    z.mesh.material.color.setHex(color);
-    z.mesh.material.opacity = 0.3;
-    return z;
+    return this._spawnDisc(this.zones, pos, radius, life, color);
+  }
+
+  _spawnDisc(list, pos, radius, life, color) {
+    let d = null;
+    for (let i = 0; i < list.length; i++) if (!list[i].active) { d = list[i]; break; }
+    if (!d) return null;
+    d.active = true;
+    d.x = pos.x; d.z = pos.z;
+    d.radius = radius;
+    d.life = life; d.maxLife = life;
+    d.color = color;
+    d.alpha = d.baseAlpha;
+    return d;
   }
 
   _freeProjectile() {
@@ -186,7 +125,6 @@ export class Effects {
 
   _release(p) {
     p.active = false;
-    p.mesh.visible = false;
     p.onHit = null;
     p.owner = null;
     p.target = null;
@@ -206,23 +144,22 @@ export class Effects {
       if (!p.active) continue;
       if (p.target) this._stepHoming(p, dt);
       else this._stepLinear(p, dt);
-      if (p.active) p.mesh.position.copy(p.pos);
     }
     const rings = this.rings;
     for (let i = 0; i < rings.length; i++) {
       const r = rings[i];
       if (!r.active) continue;
       r.life -= dt;
-      if (r.life <= 0) { r.active = false; r.mesh.visible = false; continue; }
-      r.mesh.material.opacity = 0.8 * (r.life / r.maxLife);
+      if (r.life <= 0) { r.active = false; continue; }
+      r.alpha = r.baseAlpha * (r.life / r.maxLife);
     }
     const zones = this.zones;
     for (let i = 0; i < zones.length; i++) {
       const z = zones[i];
       if (!z.active) continue;
       z.life -= dt;
-      if (z.life <= 0) { z.active = false; z.mesh.visible = false; continue; }
-      z.mesh.material.opacity = 0.3 * (0.4 + 0.6 * (z.life / z.maxLife));
+      if (z.life <= 0) { z.active = false; continue; }
+      z.alpha = z.baseAlpha * (0.4 + 0.6 * (z.life / z.maxLife));
     }
   }
 
@@ -292,10 +229,10 @@ export class Effects {
 
   reset() {
     for (let i = 0; i < this.projectiles.length; i++) if (this.projectiles[i].active) this._release(this.projectiles[i]);
-    for (let i = 0; i < this.rings.length; i++) { this.rings[i].active = false; this.rings[i].mesh.visible = false; }
-    for (let i = 0; i < this.zones.length; i++) { this.zones[i].active = false; this.zones[i].mesh.visible = false; }
+    for (let i = 0; i < this.rings.length; i++) this.rings[i].active = false;
+    for (let i = 0; i < this.zones.length; i++) this.zones[i].active = false;
   }
 }
 
-// The one shared instance. Heroes call effects.attach(scene, world); main calls update.
+// The one shared instance. Heroes call effects.attach(world); Match calls update.
 export const effects = new Effects();

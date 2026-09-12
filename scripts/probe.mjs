@@ -315,7 +315,7 @@ async function main() {
     m.reset(); m.skipCountdown();
     const T = g.towers.red, N = g.nexuses.red;
     H.teleport(0, -10); E.teleport(0, -8); fresh(H); fresh(E);
-    const ally = W.add(new Minion('blue', W, g.engine.scene, { x: 0, y: 0, z: -12 }, { ranged: false, wave: 0 }));
+    const ally = W.add(new Minion('blue', W, { x: 0, y: 0, z: -12 }, { ranged: false, wave: 0 }));
     step(0.3);
     r.towerTargetsMinionsFirst = T.target === ally && near(H.hp, H.maxHp, 1e-6);
     // The hero hits an enemy hero inside tower range: immediate aggro, then the ramp.
@@ -384,7 +384,7 @@ async function main() {
     H.teleport(0, 37); E.teleport(0, -37);
     // A lone blue minion walks the lane at 3.2 m/s; CC changes that distance in 1 s.
     // One minion per kind: slow alone (root would mask it), then root, then stun.
-    const spawn = () => W.add(new Minion('blue', W, g.engine.scene, { x: 5, y: 0, z: 20 }, { ranged: false, wave: 0 }));
+    const spawn = () => W.add(new Minion('blue', W, { x: 5, y: 0, z: 20 }, { ranged: false, wave: 0 }));
     const mn = spawn();
     step(0.1);
     const z0 = mn.pos.z;
@@ -547,7 +547,7 @@ async function main() {
     H.gold = 99999;
     // Lone rooted minions at mid-lane keep position maths exact.
     const spawn = (x) => {
-      const mn = W.add(new Minion('red', W, g.engine.scene, { x: x, y: 0, z: 20 }, { ranged: false, wave: 0 }));
+      const mn = W.add(new Minion('red', W, { x: x, y: 0, z: 20 }, { ranged: false, wave: 0 }));
       mn.applyStatus('root', 30, 1);
       return mn;
     };
@@ -643,7 +643,7 @@ async function main() {
     const I = H.intent;
     const Minion = (await import('/src/units/minion.js')).Minion;
     const spawn = (x, z) => {
-      const mn = W.add(new Minion('red', W, g.engine.scene, { x: x, y: 0, z: z }, { ranged: false, wave: 0 }));
+      const mn = W.add(new Minion('red', W, { x: x, y: 0, z: z }, { ranged: false, wave: 0 }));
       mn.applyStatus('root', 30, 1);
       return mn;
     };
@@ -723,7 +723,7 @@ async function main() {
     const I = H.intent;
     const Minion = (await import('/src/units/minion.js')).Minion;
     const spawn = (x, z) => {
-      const mn = W.add(new Minion('red', W, g.engine.scene, { x: x, y: 0, z: z }, { ranged: false, wave: 0 }));
+      const mn = W.add(new Minion('red', W, { x: x, y: 0, z: z }, { ranged: false, wave: 0 }));
       mn.applyStatus('root', 30, 1);
       return mn;
     };

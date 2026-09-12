@@ -28,6 +28,9 @@ import { Consumables } from './economy/consumables.js';
 import { initPassives } from './economy/passives.js';
 import { ShopPanel } from './hud/shopPanel.js';
 import { DamageNumbers } from './hud/damageNumbers.js';
+import { UnitViews } from './fx/unitViews.js';
+import { EffectViews } from './fx/effectViews.js';
+import { ShotViews } from './fx/shotViews.js';
 import { ParticleSystem } from './fx/particles.js';
 import { AbilityFx } from './fx/abilityFx.js';
 import { RigAnimator } from './fx/rigAnimator.js';
@@ -62,6 +65,10 @@ function boot() {
   const scene = engine.scene;
   const input = new Input(canvas);
   const world = new World();
+  // View bridges: built before any unit exists so 'unitAdded' always finds them.
+  const unitViews = new UnitViews(scene, world);
+  const effectViews = new EffectViews(scene, effects);
+  const shotViews = new ShotViews(scene);
   const map = buildLane(scene);
   world.setCollision(map.boxes, LANE_BOUNDS);
 
@@ -92,7 +99,7 @@ function boot() {
 
   if (playerKey) {
     game = startMatch(playerKey, enemyKey || seededEnemy(playerKey), {
-      engine, input, world, scene, map, camera, controller, hud,
+      engine, input, world, scene, map, camera, controller, hud, unitViews, effectViews, shotViews,
     });
   } else if (selectRoot) {
     selectRoot.classList.remove('hidden');
@@ -103,7 +110,7 @@ function boot() {
       selectRoot.classList.add('hidden');
       if (overlay) overlay.classList.remove('hidden');
       game = startMatch(key, enemyKey || seededEnemy(key), {
-        engine, input, world, scene, map, camera, controller, hud,
+        engine, input, world, scene, map, camera, controller, hud, unitViews, effectViews, shotViews,
       });
     });
   }
@@ -112,17 +119,17 @@ function boot() {
 // Builds both heroes and everything that hangs off them, wires the start gate, and
 // publishes window.__game. Runs once per page load — a pick or `?hero=` triggers it.
 function startMatch(playerKey, enemyKey, base) {
-  const { engine, input, world, scene, map, camera, controller, hud } = base;
+  const { engine, input, world, scene, map, camera, controller, hud, unitViews, effectViews, shotViews } = base;
 
   // Heroes. Each is driven by a plain-data intent — the controller writes the
   // player's, the bot writes the enemy's, and Hero never knows which (NETCODE.md).
   const intent = makeIntent();
-  const hero = new Hero(playerKey, 'blue', world, scene);
+  const hero = new Hero(playerKey, 'blue', world);
   hero.intent = intent;
   world.add(hero);
   engine.look.follow(hero.pos);   // the shadow frustum tracks the player hero
   camera.snapTo(hero.pos);
-  const enemy = new Hero(enemyKey, 'red', world, scene);
+  const enemy = new Hero(enemyKey, 'red', world);
   enemy.intent = makeIntent();
   world.add(enemy);
 
@@ -131,11 +138,11 @@ function startMatch(playerKey, enemyKey, base) {
   const nexuses = {};
   for (let i = 0; i < TEAMS.length; i++) {
     const team = TEAMS[i];
-    towers[team] = world.add(new Tower(team, world, scene, POSITIONS[team].tower));
-    nexuses[team] = world.add(new Nexus(team, world, scene, POSITIONS[team].nexus));
+    towers[team] = world.add(new Tower(team, world, POSITIONS[team].tower));
+    nexuses[team] = world.add(new Nexus(team, world, POSITIONS[team].nexus));
     nexuses[team].setTower(towers[team]);
   }
-  const waves = new WaveSpawner(world, scene);
+  const waves = new WaveSpawner(world);
 
   // Economy, shop, AI, HUD. Order matters: the bot looks up its opponent through the
   // world, so both heroes must already be registered.
@@ -156,7 +163,11 @@ function startMatch(playerKey, enemyKey, base) {
   const rigAnimator = new RigAnimator(world);
   const fx = {
     particles, abilityFx, damageNumbers, rigAnimator,
-    update(dt) { abilityFx.update(dt); rigAnimator.update(dt); particles.update(dt); damageNumbers.update(dt); },
+    unitViews, effectViews, shotViews,
+    update(dt) {
+      unitViews.update(); effectViews.update(); shotViews.update(dt);
+      abilityFx.update(dt); rigAnimator.update(dt); particles.update(dt); damageNumbers.update(dt);
+    },
     reset() { particles.reset(); abilityFx.reset(); damageNumbers.reset(); },
   };
 

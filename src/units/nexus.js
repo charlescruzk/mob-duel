@@ -4,14 +4,13 @@
 import { Unit } from '../core/unit.js';
 import { events } from '../core/events.js';
 import { RADII } from '../map/laneData.js';
-import { makeNexusMesh } from './unitMeshes.js';
 
 const HP = 2500;
 const destroyedPayload = { team: 'blue' };
 
 export class Nexus extends Unit {
   // pos is copied. Caller does world.add(nexus) and nexus.setTower(tower).
-  constructor(team, world, scene, pos) {
+  constructor(team, world, pos) {
     super('nexus', team, RADII.nexus, HP, 0);
     this.isStatic = true;
     this.world = world;                  // World.add overwrites with the same value
@@ -21,9 +20,6 @@ export class Nexus extends Unit {
     this.invulnerable = true;            // no tower registered yet → assume shielded
     this.pos.copy(pos);
     this.pos.y = 0;
-    this.mesh = makeNexusMesh(team);
-    if (scene) scene.add(this.mesh);
-    this.syncMesh();
   }
 
   setTower(tower) {

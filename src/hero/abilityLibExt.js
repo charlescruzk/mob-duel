@@ -167,13 +167,13 @@ export function startZone(hero, sys, zdef, x, z) {
   zn.def = zdef;
   zn.acc = 0;
   zn.rec = effects.spawnZone(hero.pos, zdef.radius, zdef.duration, zdef.color || 0xffffff);
-  // spawnZone reads the mesh position from the passed object; set it exactly.
-  if (zn.rec) { zn.rec.mesh.position.x = x; zn.rec.mesh.position.z = z; }
+  // spawnZone copied the hero's position; the zone centre is (x, z) exactly.
+  if (zn.rec) { zn.rec.x = x; zn.rec.z = z; }
 }
 
 export function endZone(sys) {
   const zn = sys.zone;
-  if (zn.rec) { zn.rec.active = false; zn.rec.mesh.visible = false; zn.rec = null; }
+  if (zn.rec) { zn.rec.active = false; zn.rec = null; }
   zn.active = false;
   zn.timer = 0;
   zn.def = null;

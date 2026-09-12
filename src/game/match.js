@@ -155,10 +155,9 @@ export class Match {
     this._showBanner('READY');
   }
 
-  // world.clear() detached the mesh from the scene along with the unit.
+  // world.clear() hid the unit's mesh; adding it back re-shows it (unitAdded).
   _readd(u) {
     this.world.add(u);
-    if (u.mesh && !u.mesh.parent && this.scene) this.scene.add(u.mesh);
   }
 
   dispose() {

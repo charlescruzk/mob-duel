@@ -2,6 +2,11 @@
 // separation, wall/lane collision, velocity bookkeeping, mesh sync. Also owns match
 // time and a seedable RNG so the sim never touches the clock or Math.random.
 import { separateCircles, resolveCircleVsBoxes, clampToBounds, distSqXZ } from './physics.js';
+import { events } from './events.js';
+
+// Reused payloads: the view layer builds/hides meshes on these (fx/unitViews.js).
+const addedPayload = { unit: null };
+const removedPayload = { unit: null };
 
 export class World {
   constructor(seed = 1337) {
@@ -23,6 +28,8 @@ export class World {
     u.world = this;
     u.prevPos.copy(u.pos);
     this.units.push(u);
+    addedPayload.unit = u;
+    events.emit('unitAdded', addedPayload);
     return u;
   }
 
@@ -126,12 +133,13 @@ export class World {
       const u = q.pop();
       const i = this.units.indexOf(u);
       if (i >= 0) this.units.splice(i, 1);
-      if (u.mesh && u.mesh.parent) u.mesh.parent.remove(u.mesh);
       u.world = null;
+      removedPayload.unit = u;
+      events.emit('unitRemoved', removedPayload);
     }
   }
 
-  // Full match reset: every unit leaves the registry and the scene.
+  // Full match reset: every unit leaves the registry (the view hides their meshes).
   clear() {
     for (let i = 0; i < this.units.length; i++) this.remove(this.units[i]);
     this._flushRemovals();
