@@ -23,6 +23,7 @@ export function makeIntent() {
     recall: false,
     buy: -1,
     useItem: -1,
+    sell: -1,
   };
 }
 
@@ -34,6 +35,7 @@ export function clearIntent(i) {
   i.recall = false;
   i.buy = -1;
   i.useItem = -1;
+  i.sell = -1;
   return i;
 }
 
@@ -43,7 +45,7 @@ export function copyIntent(dst, src) {
   dst.attack = src.attack;
   dst.q = src.q; dst.w = src.w; dst.e = src.e; dst.r = src.r;
   dst.recall = src.recall;
-  dst.buy = src.buy;
+  dst.buy = src.buy; dst.sell = src.sell;
   dst.useItem = src.useItem;
   return dst;
 }

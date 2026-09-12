@@ -47,6 +47,7 @@ const CSS =
 
 export class ShopPanel {
   constructor(shop, input, hero) {
+    this.remote = null;        // online: NetMatch routes buys/sells through the intent
     this.shop = shop;
     this.input = input;
     this.hero = hero;
@@ -165,12 +166,13 @@ export class ShopPanel {
 
   _onBuy(i) {
     const r = this.shop.reason(this.hero, i);
-    if (r === 'ok') { this.shop.buy(this.hero, i); this._setMsg(''); }
+    if (r === 'ok') { if (this.remote) this.remote.remoteBuy(i); else this.shop.buy(this.hero, i); this._setMsg(''); }
     else this._setMsg(REASON_TEXT[r] || r);
   }
 
   _onSell(i) {
-    if (this.shop.sell(this.hero, i)) this._setMsg('');
+    if (this.remote) { this.remote.remoteSell(i); this._setMsg(''); }
+    else if (this.shop.sell(this.hero, i)) this._setMsg('');
   }
 
   _setMsg(text) {

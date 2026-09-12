@@ -27,16 +27,14 @@ import { Shop } from '../sim/economy/shop.js';
 import { Consumables } from '../sim/economy/consumables.js';
 import { initPassives } from '../sim/economy/passives.js';
 import { ShopPanel } from './hud/shopPanel.js';
-import { DamageNumbers } from './hud/damageNumbers.js';
 import { UnitViews } from './fx/unitViews.js';
 import { EffectViews } from './fx/effectViews.js';
 import { ShotViews } from './fx/shotViews.js';
-import { HitStop } from './fx/hitStop.js';
 import { GameAudio } from './audio/index.js';
 import { TouchControls } from './touch.js';
-import { ParticleSystem } from './fx/particles.js';
-import { AbilityFx } from './fx/abilityFx.js';
-import { RigAnimator } from './fx/rigAnimator.js';
+import { buildFx } from './fxBundle.js';
+import { wireStartGate } from './gate.js';
+import { startOnline } from './online.js';
 import { HeroBot } from '../sim/ai/heroBot.js';
 import { Match } from '../sim/game/match.js';
 
@@ -102,7 +100,14 @@ function boot() {
   const playerKey = paramHero('hero');
   const enemyKey = paramHero('enemy');
 
-  if (playerKey) {
+  const q = new URLSearchParams(location.search);
+  const base = { engine, input, world, scene, map, camera, controller, hud, unitViews, effectViews, shotViews, audio, touch };
+  if (q.get('server')) {
+    // Multiplayer (docs/PHASE4.md): the server simulates; this page mirrors and renders.
+    if (overlay) overlay.classList.remove('hidden');
+    startOnline({ server: q.get('server'), room: q.get('room') || 'new', hero: playerKey || HERO_KEYS[0], solo: q.has('solo') }, base)
+      .then((g) => { game = g; });
+  } else if (playerKey) {
     game = startMatch(playerKey, enemyKey || seededEnemy(playerKey), {
       engine, input, world, scene, map, camera, controller, hud, unitViews, effectViews, shotViews, audio, touch,
     });
@@ -159,29 +164,7 @@ function startMatch(playerKey, enemyKey, base) {
   const abilityBar = new AbilityBar(hero);
   const shopPanel = new ShopPanel(shop, input, hero);
 
-  // Visuals (fx/ never touches sim state): one particle pool, the event→recipe
-  // mapper, and the pooled damage numbers. Match.update drives fx.update; Match.reset
-  // clears it, and fx.reset is also what hero death leaves to the systems themselves.
-  const particles = new ParticleSystem(scene, 3000);
-  const abilityFx = new AbilityFx(particles, effects, camera, hero);
-  const damageNumbers = new DamageNumbers(engine.camera);
-  const rigAnimator = new RigAnimator(world);
-  const hitStop = new HitStop();
-  const fx = {
-    particles, abilityFx, damageNumbers, rigAnimator,
-    unitViews, effectViews, shotViews, hitStop, audio, touch,
-    viewScale: 1,
-    update(dt) {
-      // Hit stop slows only the view clocks; the sim already advanced by the real dt.
-      const vdt = hitStop.scaled(dt);
-      fx.viewScale = vdt / (dt || 1);
-      unitViews.update(); effectViews.update(); shotViews.update(vdt);
-      abilityFx.update(vdt); rigAnimator.update(vdt); particles.update(vdt); damageNumbers.update(dt);
-      touch.update(dt); audio.update(dt);
-    },
-    reset() { particles.reset(); abilityFx.reset(); damageNumbers.reset(); hitStop.reset(); audio.reset(); touch.reset(); },
-  };
-
+  const fx = buildFx(base, world, hero);
   touch.attach(world, camera, hero, controller);
   audio.attach(world, hero, enemy);
 
@@ -190,34 +173,7 @@ function startMatch(playerKey, enemyKey, base) {
     banner: document.getElementById('match-banner'),
     towers, nexuses, camera, hud, abilityBar, shopPanel, consumables, passives, fx,
   });
-
-  // Start gate and pointer lock. Opening the shop releases the lock on purpose, so
-  // that release must not re-raise the start overlay on top of the panel.
-  const overlay = document.getElementById('start-overlay');
-  let started = false;
-  const start = () => {
-    if (!started) {
-      started = true;
-      if (overlay) overlay.classList.add('hidden');
-    }
-    controller.enabled = true;
-    audio.unlock();
-    // Touch devices have no pointer lock: the tap itself is the gate (touch.active).
-    if (!touch.active) input.requestPointerLock();
-    hud.showReticle(!touch.active);
-  };
-  if (overlay) overlay.addEventListener('click', start);
-  input.onLockChange = (locked) => {
-    if (touch.active) return;           // lock state is meaningless on touch
-    if (!locked && started && overlay && !shopPanel.open) {
-      overlay.classList.remove('hidden');
-      controller.enabled = false;
-    } else if (locked && overlay) {
-      overlay.classList.add('hidden');
-      controller.enabled = true;
-    }
-    hud.showReticle(locked || !started);
-  };
+  wireStartGate(base, controller, shopPanel);
 
   const game = {
     engine, input, events, world, camera, controller, intent, map, hud,
@@ -231,7 +187,6 @@ function startMatch(playerKey, enemyKey, base) {
     forceRun: false,
     step: (dt) => match.update(dt),
   };
-
   window.__game = game;
   const bs = document.getElementById('boot-status');
   if (bs) bs.textContent = 'ready · three r' + THREE.REVISION + ' · ' + hero.heroKey + ' vs ' + enemy.heroKey;

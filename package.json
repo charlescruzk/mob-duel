@@ -2,12 +2,15 @@
   "name": "moba-duel",
   "version": "0.0.1",
   "private": true,
-  "description": "Third-person MOBA — the 1v1 duel-lane vertical slice",
+  "description": "Third-person MOBA \u2014 the 1v1 duel-lane vertical slice",
   "type": "module",
   "scripts": {
     "serve": "python3 -m http.server 8090 --bind 127.0.0.1",
     "check": "node scripts/check.mjs",
     "probe": "node scripts/probe.mjs",
-    "sim": "node scripts/simNode.mjs 20"
+    "sim": "node scripts/simNode.mjs 20",
+    "ws": "node scripts/wsTest.mjs",
+    "net": "node scripts/netTest.mjs",
+    "server": "node server/index.mjs"
   }
 }

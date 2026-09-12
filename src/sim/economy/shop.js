@@ -23,6 +23,7 @@ export class Shop {
   constructor(world) {
     this.world = world;
     this._prevBuy = { blue: -1, red: -1 };
+    this._prevSell = { blue: -1, red: -1 };
   }
 
   inFountain(hero) {
@@ -122,6 +123,10 @@ export class Shop {
       const want = intent ? intent.buy : -1;
       if (this._prevBuy[team] === -1 && want >= 0 && want < ITEMS.length) this.buy(hero, want);
       this._prevBuy[team] = want;
+      // Sell intent (online play routes the panel through the intent; -1 = none).
+      const sellWant = intent && typeof intent.sell === 'number' ? intent.sell : -1;
+      if (this._prevSell[team] === -1 && sellWant >= 0) this.sell(hero, sellWant);
+      this._prevSell[team] = sellWant;
     }
   }
 }
