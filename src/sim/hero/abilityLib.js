@@ -15,7 +15,7 @@ const dir = { x: 0, z: 0 };
 const centre = { x: 0, z: 0 };
 const pt = { x: 0, y: 0, z: 0 };       // blink target; physics helpers only touch x/z
 const pullDir = { x: 0, z: 0 };        // Undertow pull scratch
-const hitPayload = { hero: null, unit: null, dealt: 0 };   // 'abilityHit' payload
+const hitPayload = { hero: null, unit: null, dealt: 0, slot: '' };   // 'abilityHit' payload
 const COLOR_DAMAGE = 0xffa040;
 const COLOR_TELEGRAPH = 0xff5030;
 const COLOR_BLINK = 0x9fd6ff;
@@ -43,15 +43,15 @@ export function applyStatusTo(unit, kind, seconds, magnitude) {
   if (typeof unit.applyStatus === 'function') unit.applyStatus(kind, seconds, magnitude);
 }
 
-// One ability damage instance. Returns HP dealt. Marks the target for Ilyra's
+// One ability damage instance. Returns HP dealt. Marks the target for Ren's
 // passive; Null Veil's spell shield eats the hit; Flow/Rend resolve afterwards.
-// dtype: 'magic' unless the ability says physical (Vaskra Q).
-export function abilityHit(hero, sys, unit, raw, dtype) {
+// dtype: 'magic' unless the ability says physical (Kazane Q).
+export function abilityHit(hero, sys, unit, raw, dtype, slot) {
   if (!unit.alive || unit.invulnerable || unit.kind === 'tower' || unit.kind === 'nexus') return 0;
   if (passives.blockedBySpellShield(hero, unit)) return 0;
   const dealt = unit.takeDamage(raw * passives.opportunistMult(hero, unit), hero, dtype || 'magic');
   passives.onAbilityHit(hero, unit, dealt);
-  hitPayload.hero = hero; hitPayload.unit = unit; hitPayload.dealt = dealt;
+  hitPayload.hero = hero; hitPayload.unit = unit; hitPayload.dealt = dealt; hitPayload.slot = slot || '';
   events.emit('abilityHit', hitPayload);
   if (sys.marksEnabled && unit.alive) sys.markUnit(unit);
   return dealt;
@@ -68,7 +68,7 @@ export function aoeDamage(hero, sys, def, cx, cz) {
   for (let i = 0; i < hits.length; i++) {
     const u = hits[i];
     if (u.kind === 'tower' || u.kind === 'nexus') continue;
-    abilityHit(hero, sys, u, dmg);
+    abilityHit(hero, sys, u, dmg, undefined, def.slot);
     if (def.pull) {
       // Undertow: drag each enemy up to `pull` metres toward the centre, never
       // past it. The world's per-frame box/bounds/separation pass clamps this.
@@ -91,7 +91,7 @@ export function aoeDamage(hero, sys, def, cx, cz) {
   return struck;
 }
 
-// --- Brakk ------------------------------------------------------------------
+// --- Bayani ------------------------------------------------------------------
 
 export function castSelfAoe(hero, sys, def) {
   return aoeDamage(hero, sys, def, hero.pos.x, hero.pos.z);
@@ -138,7 +138,7 @@ export function pushOutOfStatics(pos, radius, world) {
 
 // Advances an active dash; walls, lane edge and statics stop it early. Returns true
 // on the frame it lands (the landing AoE has then been applied). A dash with
-// `knockback` (Halvard's Charge) stops on the FIRST ENEMY HERO it touches: that
+// `knockback` (Oroku's Charge) stops on the FIRST ENEMY HERO it touches: that
 // hero is damaged, displaced along the dash and stunned, and the landing AoE is
 // skipped (it fires only if the dash completes without hitting a hero).
 export function stepDash(hero, sys, world, dt) {
@@ -169,7 +169,7 @@ export function stepDash(hero, sys, world, dt) {
     const v = world.nearestEnemy(hero.pos, hero.team, dsDef.radius, 'hero');
     if (v) {
       const kb = dsDef.knockback;
-      abilityHit(hero, sys, v, scaledDamage(hero, dsDef));
+      abilityHit(hero, sys, v, scaledDamage(hero, dsDef), undefined, dsDef.slot);
       knockApply(v, ds.dx, ds.dz, kb.dist, kb.time);
       applyStatusTo(v, 'stun', kb.stun, 1);
       return true;
@@ -190,7 +190,7 @@ export function castAoeStun(hero, sys, def) {
   return aoeDamage(hero, sys, def, hero.pos.x, hero.pos.z);
 }
 
-// --- Ilyra ------------------------------------------------------------------
+// --- Ren ------------------------------------------------------------------
 
 export function castSkillshot(hero, sys, def, aimX, aimZ) {
   aimDir(hero, aimX, aimZ, dir);

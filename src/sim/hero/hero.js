@@ -215,7 +215,7 @@ export class Hero extends Unit {
 
   // --- progression -------------------------------------------------------
 
-  // Riptide (Lumen passive): landing an ability — an 'abilityHit' whose hero is this
+  // Riptide (Amihan passive): landing an ability — an 'abilityHit' whose hero is this
   // — grants a short haste. Other heroes' hits are ignored by the owner check.
   _handleAbilityHit(p) {
     if (p.hero !== this || !this.alive) return;
@@ -225,7 +225,7 @@ export class Hero extends Unit {
 
   _handleUnitDied(unit, source) {
     if (unit === this || unit.team === this.team) return;
-    // Verdict (Kesh R): a hero kill inside the strike window refunds half the cooldown.
+    // Verdict (Lilit R): a hero kill inside the strike window refunds half the cooldown.
     const sys = this.abilities;
     if (source === this && sys.strikeUnit === unit && unit.kind === 'hero' &&
         this.world && this.world.time <= sys.strikeUntil) {

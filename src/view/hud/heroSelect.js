@@ -6,8 +6,8 @@ import { HEROES, HERO_KEYS } from '../../sim/hero/heroData.js';
 
 // Same trim palette as heroMesh.js, as canvas-friendly hex strings.
 const TRIM = {
-  brakk: '#6b6b6b', ilyra: '#f2c84b', vaskra: '#9fd6ff',
-  kesh: '#b06be0', halvard: '#8a9aa8', lumen: '#2fa8c8',
+  bayani: '#6b6b6b', ren: '#f2c84b', kazane: '#9fd6ff',
+  lilit: '#b06be0', oroku: '#8a9aa8', amihan: '#2fa8c8',
 };
 const ATTR_LABEL = { str: 'STR', agi: 'AGI', int: 'INT' };
 const BODY = '#23282f';
@@ -15,24 +15,24 @@ const BODY = '#23282f';
 // One silhouette per hero on a 96×96 canvas: the same visual hook as the in-match
 // mesh (helm, hat, hood, bow, crest…) so the card reads as that hero.
 const PORTRAITS = {
-  brakk: (c, s) => {                 // blocky helm + wide shoulders
+  bayani: (c, s) => {                 // blocky helm + wide shoulders
     c.fillRect(s * 0.30, s * 0.42, s * 0.40, s * 0.34);
     c.fillRect(s * 0.22, s * 0.50, s * 0.56, s * 0.10);
     c.fillRect(s * 0.34, s * 0.20, s * 0.32, s * 0.20);
   },
-  halvard: (c, s) => {               // tower shield plate + crest
+  oroku: (c, s) => {               // tower shield plate + crest
     c.fillRect(s * 0.52, s * 0.18, s * 0.16, s * 0.58);
     c.fillRect(s * 0.28, s * 0.42, s * 0.28, s * 0.34);
     c.fillRect(s * 0.40, s * 0.14, s * 0.20, s * 0.07);
   },
-  vaskra: (c, s) => {                // brimmed cap + bow arc
+  kazane: (c, s) => {                // brimmed cap + bow arc
     c.fillRect(s * 0.42, s * 0.44, s * 0.16, s * 0.32);
     c.fillRect(s * 0.34, s * 0.22, s * 0.32, s * 0.08);
     c.beginPath();
     c.arc(s * 0.70, s * 0.56, s * 0.16, Math.PI * 0.5, Math.PI * 1.5);
     c.stroke();
   },
-  kesh: (c, s) => {                  // pointed hood + cowl
+  lilit: (c, s) => {                  // pointed hood + cowl
     c.beginPath();
     c.moveTo(s * 0.50, s * 0.14);
     c.lineTo(s * 0.68, s * 0.52);
@@ -41,7 +41,7 @@ const PORTRAITS = {
     c.fill();
     c.fillRect(s * 0.36, s * 0.52, s * 0.28, s * 0.24);
   },
-  ilyra: (c, s) => {                 // tall cone hat + ember orb
+  ren: (c, s) => {                 // tall cone hat + ember orb
     c.beginPath();
     c.moveTo(s * 0.50, s * 0.10);
     c.lineTo(s * 0.66, s * 0.46);
@@ -53,7 +53,7 @@ const PORTRAITS = {
     c.arc(s * 0.76, s * 0.62, s * 0.06, 0, Math.PI * 2);
     c.fill();
   },
-  lumen: (c, s) => {                 // tidal crest + floating orb
+  amihan: (c, s) => {                 // tidal crest + floating orb
     c.beginPath();
     c.moveTo(s * 0.50, s * 0.18);
     c.lineTo(s * 0.64, s * 0.44);
@@ -77,7 +77,7 @@ function drawPortrait(canvas, key) {
   c.strokeStyle = TRIM[key] || '#fff';
   c.lineWidth = 3;
   c.fillStyle = TRIM[key] || '#fff';
-  (PORTRAITS[key] || PORTRAITS.brakk)(c, s);
+  (PORTRAITS[key] || PORTRAITS.bayani)(c, s);
 }
 
 export class HeroSelect {
@@ -101,7 +101,7 @@ export class HeroSelect {
 
       const badge = document.createElement('div');
       badge.className = 'hs-badge';
-      badge.textContent = d.primary.toUpperCase() + ' · ' + d.role;
+      badge.textContent = d.primary.toUpperCase() + ' · ' + d.role + ' · ' + (d.origin === 'ph' ? 'PHILIPPINES' : 'JAPAN');
 
       const portrait = document.createElement('canvas');
       portrait.className = 'hs-portrait';

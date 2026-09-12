@@ -1,6 +1,6 @@
 // AbilitySystem — one per hero. Owns cooldowns, mana gating, the cast state machine
 // (wind-ups, the dash, the ground telegraph), status timers (stun/slow/haste/shield)
-// and Ilyra's marks. Data-driven from heroData; the resolvers live in abilityLib.
+// and Ren's marks. Data-driven from heroData; the resolvers live in abilityLib.
 import { SLOTS, R_UNLOCK_LEVEL } from './heroData.js';
 import * as lib from './abilityLib.js';
 import * as ext from './abilityLibExt.js';
@@ -255,7 +255,7 @@ export class AbilitySystem {
     applyStat(this, kind, seconds, magnitude);
   }
 
-  // --- marks (Ilyra passive) ------------------------------------------------
+  // --- marks (Ren passive) ------------------------------------------------
 
   markUnit(unit) {
     const list = this.marks;

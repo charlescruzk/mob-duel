@@ -1,7 +1,7 @@
 // Knockback displacement — extracted so a knocked unit moves even while stunned
 // (the movement systems all gate on the CC timers; this runs before them). The
 // velocity is stored, not re-derived, so no per-frame allocation happens here.
-// Halvard's Charge uses it; the world's per-frame separation/wall step keeps the
+// Oroku's Charge uses it; the world's per-frame separation/wall step keeps the
 // displaced unit inside the lane, so this needs no clamping of its own.
 
 export function knockApply(unit, dirX, dirZ, dist, time) {

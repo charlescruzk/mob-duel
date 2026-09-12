@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { RADII, TEAM_COLOR } from '../../sim/map/laneData.js';
 import { toonMat, addOutline } from '../map/materials.js';
 
-const TRIM = { brakk: 0x6b6b6b, ilyra: 0xf2c84b, vaskra: 0x9fd6ff, kesh: 0xb06be0, halvard: 0x8a9aa8, lumen: 0x2fa8c8 };
+const TRIM = { bayani: 0x6b6b6b, ren: 0xf2c84b, kazane: 0x9fd6ff, lilit: 0xb06be0, oroku: 0x8a9aa8, amihan: 0x2fa8c8 };
 
 // Shared minion materials per team (mirrors the old unitMeshes sharing rule).
 const minionBody = {};
@@ -68,7 +68,7 @@ export function buildHeroRig(heroKey, team) {
 
   // Class weapon in the right hand; the head accessories carry the hero identity.
   let weaponMat;
-  if (heroKey === 'brakk') {
+  if (heroKey === 'bayani') {
     weaponMat = toonMat(0x9aa2ac, true);
     const blade = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.72, 0.16), weaponMat);
     blade.position.y = -0.42; weapon.add(blade);
@@ -78,7 +78,7 @@ export function buildHeroRig(heroKey, team) {
     helm.position.y = 0.24; head.add(helm);
     const pads = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.2, 0.44), trimMat);
     pads.position.y = 0.56; torso.add(pads);
-  } else if (heroKey === 'ilyra') {
+  } else if (heroKey === 'ren') {
     weaponMat = toonMat(0x6a4a30, true);
     const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.05, 8), weaponMat);
     staff.position.y = -0.34; weapon.add(staff);
@@ -87,13 +87,13 @@ export function buildHeroRig(heroKey, team) {
     const hat = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.6, 10), trimMat);
     hat.position.y = 0.5; head.add(hat);
     const orb = glowOrb(0xff7a30, 0.14); orb.position.set(0.5, 0.44, -0.15); torso.add(orb);
-  } else if (heroKey === 'vaskra') {
+  } else if (heroKey === 'kazane') {
     weaponMat = toonMat(0x8a6a44, true);
     const bow = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.04, 8, 20, Math.PI), weaponMat);
     bow.rotation.z = Math.PI / 2; bow.position.y = -0.1; weapon.add(bow);
     const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.3, 0.12, 10), trimMat);
     cap.position.y = 0.3; head.add(cap);
-  } else if (heroKey === 'kesh') {
+  } else if (heroKey === 'lilit') {
     weaponMat = toonMat(0x4a4f58, true);
     const dagger = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.38, 0.1), weaponMat);
     dagger.position.y = -0.24; weapon.add(dagger);
@@ -103,7 +103,7 @@ export function buildHeroRig(heroKey, team) {
     hood.position.y = 0.42; head.add(hood);
     const cowl = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.24, 0.68), trimMat);
     cowl.position.y = 0.6; torso.add(cowl);
-  } else if (heroKey === 'halvard') {
+  } else if (heroKey === 'oroku') {
     weaponMat = toonMat(0x8a9aa8, true);
     const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.5, 8), weaponMat);
     handle.position.y = -0.24; weapon.add(handle);

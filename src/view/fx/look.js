@@ -55,7 +55,7 @@ export class Look {
       const size = new THREE.Vector2(window.innerWidth || 1, window.innerHeight || 1);
       this.composer = new EffectComposer(renderer);
       this.composer.addPass(new RenderPass(scene, engine.camera));
-      this.composer.addPass(new UnrealBloomPass(size, 0.6, 0.4, 0.9));   // strength, radius, threshold
+      this.composer.addPass(new UnrealBloomPass(size, 1.0, 0.4, 0.7));   // strength, radius, threshold (PHASE3 §5)
       this.composer.addPass(new OutputPass());
     }
 

@@ -255,7 +255,7 @@ export function actTrade(b, intent) {
   // cc → ult → damage.
   const qCd = hero.cooldowns ? hero.cooldowns.q || 0 : 0;
   const wCd = hero.cooldowns ? hero.cooldowns.w || 0 : 0;
-  if (kit.w.kind === 'buff' && cast(b, intent, 'w')) return;   // Vaskra opens buffed
+  if (kit.w.kind === 'buff' && cast(b, intent, 'w')) return;   // Kazane opens buffed
   if (b.markedUntil > now || qCd > 0) attackPlayer(b, intent, lx, lz);
   else { intent.attack = false; intent.moveX = 0; intent.moveZ = 0; }
   if (b.playerDist < 4.5) moveTo(b, intent, b.safe.x, b.safe.z, 0.5);

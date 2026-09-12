@@ -38,7 +38,7 @@ export function projectileHit(hero, sys, p, u) {
     if (mult > EXEC_CAP) mult = EXEC_CAP;
     raw = p.damage * mult;
   }
-  const dealt = lib.abilityHit(hero, sys, u, raw, p.dtype);
+  const dealt = lib.abilityHit(hero, sys, u, raw, p.dtype, p.slot);
   if (p.root && dealt > 0) lib.applyStatusTo(u, 'root', p.root, 1);
   return dealt;
 }
@@ -73,7 +73,7 @@ export function pickTargeted(hero, def, aimX, aimZ) {
   return best;
 }
 
-// Kesh Q: appear `blinkBehind` behind the target along its facing, face it, strike.
+// Lilit Q: appear `blinkBehind` behind the target along its facing, face it, strike.
 export function castTargetedBlink(hero, sys, def, aimX, aimZ) {
   const t = pickTargeted(hero, def, aimX, aimZ);
   if (!t) return false;
@@ -89,11 +89,11 @@ export function castTargetedBlink(hero, sys, def, aimX, aimZ) {
   hero.teleport(pt.x, pt.z);
   effects.spawnRing(hero.pos, 0.8, 0.3, COLOR_STEALTH);
   lib.faceDir(hero, t.pos.x - pt.x, t.pos.z - pt.z);
-  lib.abilityHit(hero, sys, t, lib.scaledDamage(hero, def));
+  lib.abilityHit(hero, sys, t, lib.scaledDamage(hero, def), undefined, def.slot);
   return true;
 }
 
-// Kesh W: stealth self-status; the haste rides on the stealth timer (speedMult).
+// Lilit W: stealth self-status; the haste rides on the stealth timer (speedMult).
 export function castStealth(hero, sys, def) {
   sys.stealthHaste = def.stealthHaste || 0;
   sys.applyStatus('stealth', def.duration, 1);
@@ -111,7 +111,7 @@ export function endStealth(sys, hero) {
   }
 }
 
-// Kesh E: 60° cone, 4.5 m — angle-and-distance test straight over world.units.
+// Lilit E: 60° cone, 4.5 m — angle-and-distance test straight over world.units.
 export function castCone(hero, sys, def, aimX, aimZ) {
   lib.aimDir(hero, aimX, aimZ, cdir);
   lib.faceDir(hero, cdir.x, cdir.z);
@@ -129,7 +129,7 @@ export function castCone(hero, sys, def, aimX, aimZ) {
     const d = Math.sqrt(dx * dx + dz * dz);
     if (d > def.range || d < 1e-6) continue;
     if ((dx * cdir.x + dz * cdir.z) / d < cos) continue;
-    lib.abilityHit(hero, sys, u, dmg);
+    lib.abilityHit(hero, sys, u, dmg, undefined, def.slot);
     if (def.slowPct) lib.applyStatusTo(u, 'slow', def.slowTime, def.slowPct);
     struck++;
   }
@@ -137,7 +137,7 @@ export function castCone(hero, sys, def, aimX, aimZ) {
   return struck;
 }
 
-// Kesh R: targeted strike, doubled below the exec threshold; a hero kill inside the
+// Lilit R: targeted strike, doubled below the exec threshold; a hero kill inside the
 // strike window refunds half the cooldown (refund fires from the unitDied listener).
 export function castTargeted(hero, sys, def, aimX, aimZ) {
   const t = pickTargeted(hero, def, aimX, aimZ);
@@ -147,7 +147,7 @@ export function castTargeted(hero, sys, def, aimX, aimZ) {
   lib.faceDir(hero, t.pos.x - hero.pos.x, t.pos.z - hero.pos.z);
   sys.strikeUnit = t;
   sys.strikeUntil = hero.world ? hero.world.time + STRIKE_WINDOW : 0;
-  lib.abilityHit(hero, sys, t, dmg);
+  lib.abilityHit(hero, sys, t, dmg, undefined, def.slot);
   // Shield Bash's stun rides the same targeted resolver (after the hit so the stun
   // itself never boosts the strike's Opportunist window).
   if (def.stunTime) lib.applyStatusTo(t, 'stun', def.stunTime, 1);
@@ -200,7 +200,7 @@ export function tickZone(hero, sys, dt) {
       zn.acc += dt;
       if (zn.acc >= def.tickInterval) {
         zn.acc = 0;
-        lib.abilityHit(hero, sys, u, atLevel(def.tickDamage, hero.level) * (1 + hero.abilityAmp));
+        lib.abilityHit(hero, sys, u, atLevel(def.tickDamage, hero.level) * (1 + hero.abilityAmp), undefined, def.slot);
       }
     }
   }

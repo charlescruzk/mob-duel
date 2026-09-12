@@ -31,6 +31,9 @@ import { DamageNumbers } from './hud/damageNumbers.js';
 import { UnitViews } from './fx/unitViews.js';
 import { EffectViews } from './fx/effectViews.js';
 import { ShotViews } from './fx/shotViews.js';
+import { HitStop } from './fx/hitStop.js';
+import { GameAudio } from './audio/index.js';
+import { TouchControls } from './touch.js';
 import { ParticleSystem } from './fx/particles.js';
 import { AbilityFx } from './fx/abilityFx.js';
 import { RigAnimator } from './fx/rigAnimator.js';
@@ -69,6 +72,8 @@ function boot() {
   const unitViews = new UnitViews(scene, world);
   const effectViews = new EffectViews(scene, effects);
   const shotViews = new ShotViews(scene);
+  const audio = new GameAudio();
+  const touch = new TouchControls(input, canvas);
   const map = buildLane(scene);
   world.setCollision(map.boxes, LANE_BOUNDS);
 
@@ -88,7 +93,7 @@ function boot() {
   let game = null;
   engine.start((dt) => {
     if (!game || game.paused) return;
-    if (input.locked || game.forceRun) game.match.update(dt);
+    if (input.locked || touch.active || game.forceRun) game.match.update(dt);
     else game.match.idle(dt);
   });
 
@@ -99,7 +104,7 @@ function boot() {
 
   if (playerKey) {
     game = startMatch(playerKey, enemyKey || seededEnemy(playerKey), {
-      engine, input, world, scene, map, camera, controller, hud, unitViews, effectViews, shotViews,
+      engine, input, world, scene, map, camera, controller, hud, unitViews, effectViews, shotViews, audio, touch,
     });
   } else if (selectRoot) {
     selectRoot.classList.remove('hidden');
@@ -110,7 +115,7 @@ function boot() {
       selectRoot.classList.add('hidden');
       if (overlay) overlay.classList.remove('hidden');
       game = startMatch(key, enemyKey || seededEnemy(key), {
-        engine, input, world, scene, map, camera, controller, hud, unitViews, effectViews, shotViews,
+        engine, input, world, scene, map, camera, controller, hud, unitViews, effectViews, shotViews, audio, touch,
       });
     });
   }
@@ -119,7 +124,7 @@ function boot() {
 // Builds both heroes and everything that hangs off them, wires the start gate, and
 // publishes window.__game. Runs once per page load — a pick or `?hero=` triggers it.
 function startMatch(playerKey, enemyKey, base) {
-  const { engine, input, world, scene, map, camera, controller, hud, unitViews, effectViews, shotViews } = base;
+  const { engine, input, world, scene, map, camera, controller, hud, unitViews, effectViews, shotViews, audio, touch } = base;
 
   // Heroes. Each is driven by a plain-data intent — the controller writes the
   // player's, the bot writes the enemy's, and Hero never knows which (NETCODE.md).
@@ -161,14 +166,20 @@ function startMatch(playerKey, enemyKey, base) {
   const abilityFx = new AbilityFx(particles, effects, camera, hero);
   const damageNumbers = new DamageNumbers(engine.camera);
   const rigAnimator = new RigAnimator(world);
+  const hitStop = new HitStop();
   const fx = {
     particles, abilityFx, damageNumbers, rigAnimator,
-    unitViews, effectViews, shotViews,
+    unitViews, effectViews, shotViews, hitStop, audio, touch,
+    viewScale: 1,
     update(dt) {
-      unitViews.update(); effectViews.update(); shotViews.update(dt);
-      abilityFx.update(dt); rigAnimator.update(dt); particles.update(dt); damageNumbers.update(dt);
+      // Hit stop slows only the view clocks; the sim already advanced by the real dt.
+      const vdt = hitStop.scaled(dt);
+      fx.viewScale = vdt / (dt || 1);
+      unitViews.update(); effectViews.update(); shotViews.update(vdt);
+      abilityFx.update(vdt); rigAnimator.update(vdt); particles.update(vdt); damageNumbers.update(dt);
+      touch.update(dt); audio.update(dt);
     },
-    reset() { particles.reset(); abilityFx.reset(); damageNumbers.reset(); },
+    reset() { particles.reset(); abilityFx.reset(); damageNumbers.reset(); hitStop.reset(); audio.reset(); touch.reset(); },
   };
 
   const match = new Match({
@@ -187,10 +198,14 @@ function startMatch(playerKey, enemyKey, base) {
       if (overlay) overlay.classList.add('hidden');
     }
     controller.enabled = true;
-    input.requestPointerLock();
+    audio.unlock();
+    // Touch devices have no pointer lock: the tap itself is the gate (touch.active).
+    if (!touch.active) input.requestPointerLock();
+    hud.showReticle(!touch.active);
   };
   if (overlay) overlay.addEventListener('click', start);
   input.onLockChange = (locked) => {
+    if (touch.active) return;           // lock state is meaningless on touch
     if (!locked && started && overlay && !shopPanel.open) {
       overlay.classList.remove('hidden');
       controller.enabled = false;

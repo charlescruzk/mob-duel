@@ -12,48 +12,48 @@ const RING = 64;
 // 'escape' | 'heal' | 'stealth' — that drives the generalized cast rules. Radius
 // rides along for the skillshot line-block test.
 export const BOT_KIT = {
-  brakk: {
-    id: 'brakk',
+  bayani: {
+    id: 'bayani',
     melee: true,
     q: { cost: 40, range: 3.0, radius: 3.0, base: 60, step: 15, minLevel: 1, kind: 'damage' },
     w: { cost: 50, range: 0, radius: 0, base: 0, step: 0, minLevel: 1, kind: 'buff' },
     e: { cost: 55, range: 6.0, radius: 1.5, base: 50, step: 12, minLevel: 1, kind: 'escape' },
     r: { cost: 100, range: 3.5, radius: 3.5, base: 140, step: 35, minLevel: 4, kind: 'damage' },
   },
-  ilyra: {
-    id: 'ilyra',
+  ren: {
+    id: 'ren',
     melee: false,
     q: { cost: 45, range: 11.0, radius: 0.5, base: 70, step: 20, minLevel: 1, kind: 'damage' },
     w: { cost: 60, range: 8.0, radius: 2.5, base: 60, step: 18, minLevel: 1, kind: 'damage' },
     e: { cost: 50, range: 4.5, radius: 0, base: 0, step: 0, minLevel: 1, kind: 'escape' },
     r: { cost: 110, range: 16.0, radius: 0.8, base: 180, step: 45, minLevel: 4, kind: 'damage' },
   },
-  vaskra: {
-    id: 'vaskra',
+  kazane: {
+    id: 'kazane',
     melee: false,
     q: { cost: 40, range: 14.0, radius: 0.5, base: 65, step: 18, minLevel: 1, kind: 'damage' },
     w: { cost: 45, range: 0, radius: 0, base: 0, step: 0, minLevel: 1, kind: 'buff' },
     e: { cost: 35, range: 3.5, radius: 0, base: 0, step: 0, minLevel: 1, kind: 'escape' },
     r: { cost: 100, range: 30.0, radius: 0.6, base: 150, step: 40, minLevel: 4, kind: 'damage' },
   },
-  kesh: {
-    id: 'kesh',
+  lilit: {
+    id: 'lilit',
     melee: true,
     q: { cost: 45, range: 7.0, radius: 0, base: 55, step: 15, minLevel: 1, kind: 'damage' },
     w: { cost: 50, range: 0, radius: 0, base: 0, step: 0, minLevel: 1, kind: 'stealth' },
     e: { cost: 40, range: 4.5, radius: 0, base: 60, step: 16, minLevel: 1, kind: 'damage' },
     r: { cost: 90, range: 5.0, radius: 0, base: 120, step: 30, minLevel: 4, kind: 'damage' },
   },
-  halvard: {
-    id: 'halvard',
+  oroku: {
+    id: 'oroku',
     melee: true,
     q: { cost: 40, range: 2.5, radius: 0, base: 50, step: 14, minLevel: 1, kind: 'cc' },
     w: { cost: 50, range: 0, radius: 0, base: 0, step: 0, minLevel: 1, kind: 'buff' },
     e: { cost: 55, range: 8.0, radius: 1.2, base: 40, step: 10, minLevel: 1, kind: 'cc' },
     r: { cost: 100, range: 5.0, radius: 5.0, base: 120, step: 30, minLevel: 4, kind: 'cc' },
   },
-  lumen: {
-    id: 'lumen',
+  amihan: {
+    id: 'amihan',
     melee: false,
     q: { cost: 50, range: 10.0, radius: 0.6, base: 55, step: 14, minLevel: 1, kind: 'cc' },
     w: { cost: 60, range: 0, radius: 0, base: 0, step: 0, minLevel: 1, kind: 'heal' },
@@ -67,14 +67,14 @@ export function kitOf(hero) {
   const k = hero.heroKey || hero.key || hero.heroId || hero.name;
   if (typeof k === 'string') {
     const s = k.toLowerCase();
-    if (s.indexOf('brakk') >= 0) return BOT_KIT.brakk;
-    if (s.indexOf('ilyra') >= 0) return BOT_KIT.ilyra;
-    if (s.indexOf('vaskra') >= 0) return BOT_KIT.vaskra;
-    if (s.indexOf('kesh') >= 0) return BOT_KIT.kesh;
-    if (s.indexOf('halvard') >= 0) return BOT_KIT.halvard;
-    if (s.indexOf('lumen') >= 0) return BOT_KIT.lumen;
+    if (s.indexOf('bayani') >= 0) return BOT_KIT.bayani;
+    if (s.indexOf('ren') >= 0) return BOT_KIT.ren;
+    if (s.indexOf('kazane') >= 0) return BOT_KIT.kazane;
+    if (s.indexOf('lilit') >= 0) return BOT_KIT.lilit;
+    if (s.indexOf('oroku') >= 0) return BOT_KIT.oroku;
+    if (s.indexOf('amihan') >= 0) return BOT_KIT.amihan;
   }
-  return (hero.attackRange || 2) <= 2.5 ? BOT_KIT.brakk : BOT_KIT.ilyra;
+  return (hero.attackRange || 2) <= 2.5 ? BOT_KIT.bayani : BOT_KIT.ren;
 }
 
 export function abilityDamage(kit, slot, hero) {

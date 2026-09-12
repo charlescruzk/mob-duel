@@ -9,12 +9,12 @@ import { abilityReady, REACTION_DELAY } from './botSense.js';
 // warden plate → titan grip / colossus; AGI: feather band → vampire fang →
 // bladedancer; INT: sapphire bead → stormglass → void lens.
 const PRIORITY = {
-  brakk:   [2, 0, 0, 4, 14, 17],
-  halvard: [2, 0, 0, 4, 14, 19],
-  vaskra:  [2, 0, 0, 5, 12, 20],
-  kesh:    [2, 0, 0, 5, 12, 20],
-  ilyra:   [2, 0, 0, 6, 15, 18],
-  lumen:   [2, 0, 0, 6, 15, 18],
+  bayani:   [2, 0, 0, 4, 14, 17],
+  oroku: [2, 0, 0, 4, 14, 19],
+  kazane:  [2, 0, 0, 5, 12, 20],
+  lilit:    [2, 0, 0, 5, 12, 20],
+  ren:   [2, 0, 0, 6, 15, 18],
+  amihan:   [2, 0, 0, 6, 15, 18],
 };
 const need = new Array(25).fill(0);
 const EMPTY_INV = [];
@@ -36,7 +36,7 @@ function copiesOf(hero, item) {
 export function nextBuy(b) {
   const hero = b.hero;
   if (!hero.items || hero.items.length >= INVENTORY_SLOTS) return -1;
-  const list = PRIORITY[b.kit.id] || PRIORITY.brakk;
+  const list = PRIORITY[b.kit.id] || PRIORITY.bayani;
   for (let i = 0; i < ITEMS.length; i++) need[i] = 0;
   for (let i = 0; i < list.length; i++) {
     const idx = list[i];
@@ -64,7 +64,7 @@ export function maybePotion(b, intent) {
   return false;
 }
 
-// Cast the heal slot (Lumen W) below half HP.
+// Cast the heal slot (Amihan W) below half HP.
 export function maybeHeal(b, intent) {
   if (b.kit.w.kind !== 'heal' || b.hpPct >= 0.5) return false;
   return cast(b, intent, 'w');

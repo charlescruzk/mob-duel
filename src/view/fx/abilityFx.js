@@ -12,37 +12,37 @@ const TRAIL_COLOR = new THREE.Color();   // scratch: projectile records carry a 
 // r = ring(x,z,hex,count,radius,speed,life,size), c = column(x,z,hex,count,height,life,size).
 // `hit` is the impact colour used for every landing of that hero's kit.
 const RECIPES = {
-  brakk: {
+  bayani: {
     hit: 0xc8ccd0,
     q: ['b', 14, 7, 0.7, 0.4, 0.16], w: ['r', 20, 0.4, 3, 0.5, 0.18],
     e: ['b', 16, 9, 0.4, 0.35, 0.15], r: ['c', 26, 1.4, 0.7, 0.2],
     auto: ['b', 5, 5, 0.5, 0.25, 0.12],
   },
-  ilyra: {
+  ren: {
     hit: 0xff8a3c,
     q: ['b', 14, 8, 0.6, 0.4, 0.16], w: ['b', 18, 6, 1.0, 0.45, 0.17],
     e: ['r', 16, 0.2, 4, 0.4, 0.15], r: ['c', 30, 1.4, 0.7, 0.22],
     auto: ['b', 4, 4, 0.6, 0.3, 0.11],
   },
-  vaskra: {
+  kazane: {
     hit: 0x9fd6ff,
     q: ['b', 14, 9, 0.5, 0.4, 0.15], w: ['r', 18, 0.3, 3.5, 0.45, 0.15],
     e: ['b', 12, 6, 0.4, 0.3, 0.14], r: ['c', 26, 1.6, 0.6, 0.2],
     auto: ['b', 4, 4, 0.5, 0.35, 0.11],
   },
-  kesh: {
+  lilit: {
     hit: 0xb06be0,
     q: ['b', 16, 8, 0.6, 0.4, 0.16], w: ['r', 20, 0.2, 3.5, 0.5, 0.16],
     e: ['b', 20, 7, 0.8, 0.4, 0.16], r: ['b', 30, 10, 1.0, 0.5, 0.2],
     auto: ['b', 5, 5, 0.5, 0.3, 0.12],
   },
-  halvard: {
+  oroku: {
     hit: 0xaab8c4,
     q: ['b', 18, 6, 0.5, 0.4, 0.18], w: ['r', 16, 0.5, 3, 0.5, 0.18],
     e: ['b', 20, 8, 0.6, 0.4, 0.17], r: ['c', 30, 1.8, 0.8, 0.22],
     auto: ['b', 5, 4, 0.4, 0.35, 0.13],
   },
-  lumen: {
+  amihan: {
     hit: 0x48c0d8,
     q: ['b', 14, 7, 0.5, 0.4, 0.16], w: ['r', 18, 0.4, 3, 0.5, 0.16],
     e: ['r', 22, 1.5, 5, 0.5, 0.17], r: ['c', 30, 1.8, 0.8, 0.2],

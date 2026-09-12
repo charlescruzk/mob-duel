@@ -1,7 +1,7 @@
 // Stat resolution for Hero — extracted from hero.js to keep it under ~300 lines.
 // recomputeStats folds heroData base + level + items into the derived stats;
 // refreshArmor applies level + item armor + the strongest ability armor buff plus
-// the Unyielding passive (Halvard: below threshold HP, +bonus armor, additive)
+// the Unyielding passive (Oroku: below threshold HP, +bonus armor, additive)
 // and caps the total. Hero.update calls refreshArmor every frame so the passive
 // tracks HP live without an armor setter fighting the Unit constructor.
 import { atLevel, ATTR, ARMOR_CAP, ATTACK_SPEED_CAP, CDR_CAP } from './heroData.js';

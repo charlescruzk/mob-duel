@@ -19,11 +19,11 @@ const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/M
 const PORT = Number(process.env.PROBE_PORT || 8090);
 const CDP = Number(process.env.PROBE_CDP || 9343);
 const URL_BASE = `http://127.0.0.1:${PORT}/index.html`;
-// The first load runs a normal match (?hero=brakk); the hero-select block navigates
+// The first load runs a normal match (?hero=bayani); the hero-select block navigates
 // to the bare page, where the match is only built once a card is clicked. lowfx
 // keeps SwiftShader off the bloom composer for the long non-look stretch — the
 // look blocks below navigate to a full-fx page explicitly.
-const URL = `${URL_BASE}?cb=${Date.now()}&hero=brakk&enemy=ilyra&lowfx=1`;
+const URL = `${URL_BASE}?cb=${Date.now()}&hero=bayani&enemy=ren&lowfx=1`;
 
 let exitCode = 0;
 
@@ -136,7 +136,7 @@ async function main() {
   console.log(state?.result?.value ?? '(eval failed)');
   if (!state?.result?.value?.includes('"hasGame":true')) exitCode = 1;
 
-  // Fresh page for hero-specific blocks (the first load runs the default Brakk page):
+  // Fresh page for hero-specific blocks (the first load runs the default Bayani page):
   // navigate with new query params, click through the start gate, pause the clock.
   const restart = async (qs) => {
     // Empty qs → the bare page: the hero-select overlay shows and no match is built.
@@ -227,7 +227,7 @@ async function main() {
   await block('hero: movement, lane bound, recall, death and respawn', `(async () => {
     ${SETUP}
     const I = H.intent;
-    // Walks at Brakk's 5.2 m/s and stops at the lane edge (x = 7 - radius).
+    // Walks at Bayani's 5.2 m/s and stops at the lane edge (x = 7 - radius).
     H.teleport(0, 30); I.moveZ = -1; step(1);
     r.heroMoves = near(H.pos.z, 30 - 5.2, 0.1) && near(H.pos.x, 0, 1e-6);
     I.moveZ = 0; I.moveX = 1; step(3);
@@ -254,13 +254,13 @@ async function main() {
     const I = H.intent, J = E.intent;
     H.teleport(0, 0); E.teleport(0, -2); fresh(H); fresh(E);
     I.aimX = E.pos.x; I.aimZ = E.pos.z;
-    // Brakk Q is a circle r3 around him: it lands on the mage, spends mana, starts a cooldown.
+    // Bayani Q is a circle r3 around him: it lands on the mage, spends mana, starts a cooldown.
     edge(I, 'q'); step(0.5);
     r.abilityCastsAndDamages = E.hp < E.maxHp && H.cooldowns.q > 0 && H.mp < H.maxMp;
-    // Brakk W is a self shield.
+    // Bayani W is a self shield.
     edge(I, 'w'); step(0.05);
     r.brakkWShields = H.shield > 0;
-    // Brakk E dashes toward the aim point and lands damage.
+    // Bayani E dashes toward the aim point and lands damage.
     fresh(H); E.hp = E.maxHp; H.teleport(0, 0); E.teleport(0, -3);
     I.aimX = 0; I.aimZ = -3; edge(I, 'e'); step(1);
     r.brakkEDashDamages = H.pos.z < -0.5 && E.hp < E.maxHp;
@@ -275,7 +275,7 @@ async function main() {
     fresh(H); E.hp = E.maxHp; edge(I, 'q'); step(0.5);
     const afterFirst = E.hp; E.hp = E.maxHp; edge(I, 'q'); step(0.5);
     r.cooldownGates = afterFirst < E.maxHp && near(E.hp, E.maxHp, 1e-6) && H.abilityState('q') === 'cooldown';
-    // Ilyra's kit, driven through the enemy's intent: Q skillshot, W ground burst, E blink.
+    // Ren's kit, driven through the enemy's intent: Q skillshot, W ground burst, E blink.
     fresh(H); fresh(E); H.teleport(0, 0); E.teleport(0, -6); I.aimX = 0; I.aimZ = 0;
     J.aimX = 0; J.aimZ = 0; H.hp = H.maxHp;
     edge(J, 'q'); step(1.0);
@@ -454,7 +454,7 @@ async function main() {
     shop.buy(H, 'featherband');
     r.attributeAgi = near(H.itemArmor, 0.048, 1e-6) && near(H.itemAttackSpeed, 0.12, 1e-6)
       && near(H.attackDamage, ad0 + 12, 1e-6);
-    // Intellect: on Ilyra (INT primary) it adds attack damage; on Brakk it does not.
+    // Intellect: on Ren (INT primary) it adds attack damage; on Bayani it does not.
     const ead0 = E.attackDamage;
     shop.buy(E, 'sapphirebead');
     shop.buy(H, 'sapphirebead');
@@ -636,10 +636,10 @@ async function main() {
     } catch (e) { return { error: String((e && e.stack) || e) }; }
   })()`);
 
-  // --- Vaskra (task 3) — fresh page with ?hero=vaskra (enemy fills as Brakk) ---
-  await restart('hero=vaskra&lowfx=1');
+  // --- Kazane (task 3) — fresh page with ?hero=kazane (enemy fills as Bayani) ---
+  await restart('hero=kazane&enemy=bayani&lowfx=1');   // numbers below assume Bayani's 0.15 armor
 
-  await block('vaskra: pierce, quickdraw, tumble, headhunter, deadeye', `(async () => {
+  await block('kazane: pierce, quickdraw, tumble, headhunter, deadeye', `(async () => {
     try {
     ${SETUP}
     const I = H.intent;
@@ -717,9 +717,9 @@ async function main() {
     } catch (e) { return { error: String((e && e.stack) || e) }; }
   })()`);
 
-  await restart('hero=kesh&enemy=ilyra&lowfx=1');
+  await restart('hero=lilit&enemy=ren&lowfx=1');
 
-  await block('kesh: blink, veil, cone, opportunist, verdict', `(async () => {
+  await block('lilit: blink, veil, cone, opportunist, verdict', `(async () => {
     try {
     ${SETUP}
     const I = H.intent;
@@ -759,7 +759,7 @@ async function main() {
     fresh(H);
 
     // W ends on attack, and the first auto carries the veil bonus (40 at level 1):
-    // (60 + 40) × 0.92. Kesh is melee — the hit lands at wind-up end.
+    // (60 + 40) × 0.92. Lilit is melee — the hit lands at wind-up end.
     E.teleport(0, 5); H.teleport(0, 3.8);
     edge(I, 'w'); step(0.1);
     const ehpA = E.hp;
@@ -832,9 +832,9 @@ async function main() {
     } catch (e) { return { error: String((e && e.stack) || e) }; }
   })()`);
 
-  await restart('hero=halvard&enemy=ilyra&lowfx=1');
+  await restart('hero=oroku&enemy=ren&lowfx=1');
 
-  await block('halvard: shield bash, stonewall reflect, charge knockback, earthbreaker zone, unyielding', `(async () => {
+  await block('oroku: shield bash, stonewall reflect, charge knockback, earthbreaker zone, unyielding', `(async () => {
     try {
     ${SETUP}
     const I = H.intent;
@@ -855,8 +855,8 @@ async function main() {
     edge(I, 'w');
     r.halvardWArmorBuff = near(H.armor, 0.40, 1e-3) && H.abilities.reflectTimer > 0;
 
-    // W reflects 15% of PRE-mitigation damage: Ilyra's 48 auto costs Halvard
-    // 48 × (1 − 0.40) = 28.8 and costs Ilyra 48 × 0.15 × 0.92 = 6.62 as magic —
+    // W reflects 15% of PRE-mitigation damage: Ren's 48 auto costs Oroku
+    // 48 × (1 − 0.40) = 28.8 and costs Ren 48 × 0.15 × 0.92 = 6.62 as magic —
     // in the same instant, inside the attacker's takeDamage.
     fresh(H);
     E.teleport(0, 3);
@@ -911,14 +911,14 @@ async function main() {
     } catch (e) { return { error: String((e && e.stack) || e) }; }
   })()`);
 
-  await restart('hero=lumen&enemy=brakk&lowfx=1');
+  await restart('hero=amihan&enemy=bayani&lowfx=1');
 
-  await block('lumen: tidal snare root, mend heal+hot, undertow pull, deluge zone, riptide haste, abilityHit event', `(async () => {
+  await block('amihan: tidal snare root, mend heal+hot, undertow pull, deluge zone, riptide haste, abilityHit event', `(async () => {
     try {
     ${SETUP}
     const I = H.intent;
-    // Mid-lane; regens zeroed so heal/damage windows are exact. Brakk armour 0.15
-    // (×0.85). H is Lumen at (0,0); E is Brakk.
+    // Mid-lane; regens zeroed so heal/damage windows are exact. Bayani armour 0.15
+    // (×0.85). H is Amihan at (0,0); E is Bayani.
     H.teleport(0, 0); E.teleport(0, 5); fresh(H); fresh(E);
     H.hpRegen = 0; E.hpRegen = 0; H.mpRegen = 0; E.mpRegen = 0;
 
@@ -951,7 +951,7 @@ async function main() {
     fresh(H);
 
     // E: ground circle r3 at the reticle (in range 7). 0.4 s telegraph, then the
-    // pull drags Brakk toward the centre: Brakk sits 1 m off it (aim 4, E at 5),
+    // pull drags Bayani toward the centre: Bayani sits 1 m off it (aim 4, E at 5),
     // so the pull takes him the full 1 m → z = 4, with 50 raw ×0.85 and a 40% slow.
     const ehpE = E.hp;
     I.aimX = 0; I.aimZ = 4;
@@ -961,7 +961,7 @@ async function main() {
     fresh(H); fresh(E);
 
     // R at level 4 (unlock): 0.5 s telegraph, then a 3.5 s r5 tide at the reticle
-    // (in range 6): 50% slow, 76 (40+3×12) raw per 0.5 s tick ×0.85, and Lumen
+    // (in range 6): 50% slow, 76 (40+3×12) raw per 0.5 s tick ×0.85, and Amihan
     // heals 3% max HP/s standing inside it (4 m from the centre, r5).
     H.level = 4; H.recomputeStats();
     H.hpRegen = 0; H.mpRegen = 0;                // recomputeStats restores them
@@ -995,61 +995,61 @@ async function main() {
     const cards = sel ? sel.querySelectorAll('.hs-card') : [];
     r.sixCardsBuilt = cards.length === 6;
     r.cardsCarryAllSixKits = cards.length === 6 &&
-      ['brakk', 'ilyra', 'vaskra', 'kesh', 'halvard', 'lumen'].every((k) =>
+      ['bayani', 'ren', 'kazane', 'lilit', 'oroku', 'amihan'].every((k) =>
         Array.prototype.some.call(cards, (c) => c.dataset.hero === k));
     r.cardShowsFourAbilities = cards.length > 0 &&
       !!cards[0].querySelector('.hs-name') && !!cards[0].querySelector('.hs-abil') &&
       cards[0].querySelectorAll('.hs-ab-row').length === 4;
-    const vaskra = Array.prototype.find.call(cards, (c) => c.dataset.hero === 'vaskra');
-    if (vaskra) vaskra.click();
+    const kazane = Array.prototype.find.call(cards, (c) => c.dataset.hero === 'kazane');
+    if (kazane) kazane.click();
     const g = window.__game;
-    r.pickBuildsMatch = !!g && g.hero.heroKey === 'vaskra';
+    r.pickBuildsMatch = !!g && g.hero.heroKey === 'kazane';
     r.selectHiddenAfterPick = !!sel && sel.classList.contains('hidden');
     r.startOverlayRevealedAfterPick = !!overlay && !overlay.classList.contains('hidden');
-    r.seededEnemyIsValid = !!g && g.enemy.heroKey !== 'vaskra' &&
-      ['brakk', 'ilyra', 'kesh', 'halvard', 'lumen'].indexOf(g.enemy.heroKey) >= 0;
+    r.seededEnemyIsValid = !!g && g.enemy.heroKey !== 'kazane' &&
+      ['bayani', 'ren', 'lilit', 'oroku', 'amihan'].indexOf(g.enemy.heroKey) >= 0;
     if (overlay) overlay.click();                 // enter the match
     g.paused = true;
-    r.matchRunsAfterStart = !!g.match && g.hero.heroKey === 'vaskra';
+    r.matchRunsAfterStart = !!g.match && g.hero.heroKey === 'kazane';
     return r;
     } catch (e) { return { error: String((e && e.stack) || e) }; }
   })()`);
 
-  await restart('hero=brakk&enemy=vaskra&lowfx=1');
+  await restart('hero=bayani&enemy=kazane&lowfx=1');
   await block('enemy param picks the bot hero', `(async () => {
     try {
     const r = {};
     const g = window.__game;
-    r.playerIsBrakk = !!g && g.hero.heroKey === 'brakk';
-    r.enemyParamPicksHero = !!g && g.enemy.heroKey === 'vaskra';
-    r.botRunsEnemyKit = !!g && !!g.bot.kit && g.bot.kit.id === 'vaskra';
+    r.playerIsBrakk = !!g && g.hero.heroKey === 'bayani';
+    r.enemyParamPicksHero = !!g && g.enemy.heroKey === 'kazane';
+    r.botRunsEnemyKit = !!g && !!g.bot.kit && g.bot.kit.id === 'kazane';
     return r;
     } catch (e) { return { error: String((e && e.stack) || e) }; }
   })()`);
 
   // Seeded default enemy: the page's own FNV-1a pick among the other five —
   // replicated here so "deterministic" is checked without a second navigation.
-  await restart('hero=kesh&lowfx=1');
+  await restart('hero=lilit&lowfx=1');
   await block('default enemy is a seeded pick among the other five', `(async () => {
     try {
     const r = {};
     const g = window.__game;
     let h = 0x811c9dc5;
-    const key = 'kesh';
+    const key = 'lilit';
     for (let i = 0; i < key.length; i++) {
       h ^= key.charCodeAt(i);
       h = Math.imul(h, 0x01000193) >>> 0;
     }
-    const others = ['brakk', 'ilyra', 'vaskra', 'halvard', 'lumen'];
-    r.defaultEnemyDiffersFromPlayer = !!g && g.enemy.heroKey !== 'kesh' &&
+    const others = ['bayani', 'ren', 'kazane', 'oroku', 'amihan'];
+    r.defaultEnemyDiffersFromPlayer = !!g && g.enemy.heroKey !== 'lilit' &&
       others.indexOf(g.enemy.heroKey) >= 0;
     r.defaultEnemyDeterministic = !!g && g.enemy.heroKey === others[h % others.length];
     return r;
     } catch (e) { return { error: String((e && e.stack) || e) }; }
   })()`);
 
-  await restart('hero=brakk&enemy=vaskra&lowfx=1');
-  await block('bot vaskra: farms last hits and opens trades with its buff', `(async () => {
+  await restart('hero=bayani&enemy=kazane&lowfx=1');
+  await block('bot kazane: farms last hits and opens trades with its buff', `(async () => {
     try {
     ${SETUP}
     m.bot = g.bot; g.bot.reset();
@@ -1066,8 +1066,8 @@ async function main() {
     } catch (e) { return { error: String((e && e.stack) || e) }; }
   })()`);
 
-  await restart('hero=brakk&enemy=kesh&lowfx=1');
-  await block('bot kesh: closes and trades when the player is in reach', `(async () => {
+  await restart('hero=bayani&enemy=lilit&lowfx=1');
+  await block('bot lilit: closes and trades when the player is in reach', `(async () => {
     try {
     ${SETUP}
     m.bot = g.bot; g.bot.reset();
@@ -1089,12 +1089,12 @@ async function main() {
     } catch (e) { return { error: String((e && e.stack) || e) }; }
   })()`);
 
-  await restart('hero=brakk&enemy=halvard&lowfx=1');
-  await block('bot halvard: stuns the player when close', `(async () => {
+  await restart('hero=bayani&enemy=oroku&lowfx=1');
+  await block('bot oroku: stuns the player when close', `(async () => {
     try {
     ${SETUP}
     m.bot = g.bot; g.bot.reset();
-    // Same mid-lane parking as the kesh trade block; Halvard's Shield Bash (1 s stun)
+    // Same mid-lane parking as the lilit trade block; Oroku's Shield Bash (1 s stun)
     // fires whenever the player is inside its 2.5 m reach during a trade.
     H.teleport(0, 4); E.teleport(0, 6); fresh(H); fresh(E);
     const seen = {}; let stuns = 0;
@@ -1112,8 +1112,8 @@ async function main() {
     } catch (e) { return { error: String((e && e.stack) || e) }; }
   })()`);
 
-  await restart('hero=brakk&enemy=lumen&lowfx=1');
-  await block('bot lumen: heals below half HP, sustains through the lane', `(async () => {
+  await restart('hero=bayani&enemy=amihan&lowfx=1');
+  await block('bot amihan: heals below half HP, sustains through the lane', `(async () => {
     try {
     ${SETUP}
     m.bot = g.bot; g.bot.reset();
@@ -1131,7 +1131,7 @@ async function main() {
     } catch (e) { return { error: String((e && e.stack) || e) }; }
   })()`);
 
-  await restart('hero=brakk&enemy=brakk&lowfx=1');
+  await restart('hero=bayani&enemy=bayani&lowfx=1');
   await block('bot: buys two potions at start, sips below 60% out of combat, not in combat', `(async () => {
     try {
     ${SETUP}
@@ -1203,7 +1203,7 @@ async function main() {
   // slow with the bloom composer); these two blocks load the full-fx and cheap paths
   // explicitly. A frame error anywhere stops the engine loop, so "still running"
   // after real rAF time is the render-still-works proof.
-  await restart('hero=brakk&enemy=ilyra');
+  await restart('hero=bayani&enemy=ren');
   await block('look: shadows, toon hero, outline, composer renders without error', `(async () => {
     try {
     const g = window.__game;
@@ -1231,7 +1231,7 @@ async function main() {
     } catch (e) { return { error: String((e && e.stack) || e) }; }
   })()`);
 
-  await restart('hero=brakk&lowfx=1');
+  await restart('hero=bayani&lowfx=1');
   await block('lowfx: shadow map and composer disabled, sim unaffected', `(async () => {
     try {
     const g = window.__game;

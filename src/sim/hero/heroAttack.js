@@ -1,7 +1,7 @@
 // BasicAttack — the auto-attack of one hero (DESIGN.md §3.1): target = enemy in range
 // nearest the reticle, chosen at wind-up start; damage at wind-up end (melee instant,
 // ranged homing projectile that cannot miss). Also applies the on-hit passives:
-// Brakk's life-on-hit and Ilyra's mark consumption.
+// Bayani's life-on-hit and Ren's mark consumption.
 import { TEAM_COLOR } from '../map/laneData.js';
 import { atLevel } from './heroData.js';
 import * as passives from '../economy/passives.js';
