@@ -156,6 +156,7 @@ function startMatch(playerKey, enemyKey, base) {
     nexuses[team].setTower(towers[team]);
   }
   const waves = new WaveSpawner(world);
+  camera.setOccludersFromWorld(world);          // keep the boom out of towers and nexuses
 
   // Economy, shop, AI, HUD. Order matters: the bot looks up its opponent through the
   // world, so both heroes must already be registered.

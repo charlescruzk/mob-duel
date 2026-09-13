@@ -13,6 +13,10 @@ const EYE_HEIGHT = 1.6;
 const SMOOTH = 14;                         // pivot lerp rate (1/s); higher = tighter
 
 const scratchDir = new THREE.Vector3();
+const OCCLUDER_PAD = 0.9;                  // metres kept between the camera and a structure
+const BOOM_STEP = 0.5;
+const BOOM_MIN = 2.0;
+const BOOM_SMOOTH = 10;
 
 export class ThirdPersonCamera {
   constructor(camera, input) {
@@ -27,6 +31,8 @@ export class ThirdPersonCamera {
     this._shakeT = 0;                      // seconds of shake left
     this._shakeAmp = 0;
     this._shakeDur = 1;
+    this.occluders = [];                   // { x, z, r }: towers and nexuses the boom must stay out of
+    this.dist = DISTANCE;                  // current boom length (shortened near occluders)
     this._updateBasis();
   }
 
@@ -68,7 +74,8 @@ export class ThirdPersonCamera {
       this._updateBasis();
     }
 
-    if (this._snap) { this.pivot.copy(targetPos); this._snap = false; }
+    let snapped = false;
+    if (this._snap) { this.pivot.copy(targetPos); this._snap = false; snapped = true; }
     else {
       const k = 1 - Math.exp(-SMOOTH * dt);
       this.pivot.x += (targetPos.x - this.pivot.x) * k;
@@ -79,9 +86,16 @@ export class ThirdPersonCamera {
     const cp = Math.cos(this.pitch);
     const sp = Math.sin(this.pitch);          // negative when looking down
     const cam = this.camera;
-    cam.position.x = this.pivot.x - this.forwardX * DISTANCE * cp;
-    cam.position.y = this.pivot.y + EYE_HEIGHT - sp * DISTANCE;
-    cam.position.z = this.pivot.z - this.forwardZ * DISTANCE * cp;
+    // Boom: 7 m unless a structure sits on it; then the shortest clear length,
+    // eased so the camera never pops.
+    const want = this._clearBoom(cp);
+    const kb = 1 - Math.exp(-BOOM_SMOOTH * dt);
+    if (snapped) this.dist = want;                                     // a snap moves the whole rig
+    else this.dist += (want - this.dist) * (want < this.dist ? 1 : kb); // pull in instantly, ease out
+    const D = this.dist;
+    cam.position.x = this.pivot.x - this.forwardX * D * cp;
+    cam.position.y = this.pivot.y + EYE_HEIGHT - sp * D;
+    cam.position.z = this.pivot.z - this.forwardZ * D * cp;
     scratchDir.set(this.pivot.x, this.pivot.y + EYE_HEIGHT, this.pivot.z);
     cam.lookAt(scratchDir);
     // Decay the kick on top of the settled frame position.
@@ -93,6 +107,35 @@ export class ThirdPersonCamera {
       cam.position.y += (Math.random() * 2 - 1) * a * 0.6;
       cam.position.z += (Math.random() * 2 - 1) * a;
       if (this._shakeT <= 0) this._shakeAmp = 0;
+    }
+  }
+
+  // Longest boom (≤ DISTANCE) whose camera point stays OCCLUDER_PAD outside every
+  // occluder circle in XZ. Steps of BOOM_STEP; no allocation.
+  _clearBoom(cp) {
+    const occ = this.occluders;
+    if (!occ.length) return DISTANCE;
+    for (let d = DISTANCE; d > BOOM_MIN; d -= BOOM_STEP) {
+      const cx = this.pivot.x - this.forwardX * d * cp;
+      const cz = this.pivot.z - this.forwardZ * d * cp;
+      let clear = true;
+      for (let i = 0; i < occ.length; i++) {
+        const o = occ[i];
+        const dx = cx - o.x, dz = cz - o.z, rr = o.r + OCCLUDER_PAD;
+        if (dx * dx + dz * dz < rr * rr) { clear = false; break; }
+      }
+      if (clear) return d;
+    }
+    return BOOM_MIN;
+  }
+
+  // Static units (towers, nexuses) become boom occluders. Call once per match.
+  setOccludersFromWorld(world) {
+    this.occluders.length = 0;
+    const units = world.units;
+    for (let i = 0; i < units.length; i++) {
+      const u = units[i];
+      if (u.isStatic) this.occluders.push({ x: u.pos.x, z: u.pos.z, r: u.radius });
     }
   }
 

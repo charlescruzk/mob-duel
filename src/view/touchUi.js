@@ -3,7 +3,7 @@
 // in the bottom-right corner, utilities in a short row above it, menu top-left.
 const CSS =
   ':root{--tu:clamp(44px,9.5vmin,68px)}' +
-  'body.touch #reticle,body.touch #ability-bar{display:none!important}' +
+  'body.touch #reticle,body.touch #ability-bar,body.touch #boot-status{display:none!important}' +
   'body.touch #status{left:calc(12px + env(safe-area-inset-left));bottom:auto;top:calc(10px + env(safe-area-inset-top));transform:scale(.85);transform-origin:left top}' +
   'body.touch #level-badge{left:calc(12px + env(safe-area-inset-left));bottom:auto;top:calc(72px + env(safe-area-inset-top))}' +
   'body.touch #gold{right:auto;left:calc(120px + env(safe-area-inset-left));bottom:auto;top:calc(72px + env(safe-area-inset-top));font-size:16px}' +

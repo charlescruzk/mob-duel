@@ -40,6 +40,7 @@ export async function startOnline(opts, base) {
   if (!hero || !enemy) { status('bad first snapshot', true); return null; }
   engine.look.follow(hero.pos);
   camera.snapTo(hero.pos);
+  camera.setOccludersFromWorld(mirror.world);
   // The red seat looks down the lane the other way.
   if (team === 'red') camera.yaw = Math.PI;
 
