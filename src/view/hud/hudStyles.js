@@ -22,6 +22,7 @@ const CSS =
   '.eb{position:absolute;left:0;top:0;width:56px;height:6px;margin-left:-28px;background:rgba(0,0,0,.55);border:1px solid rgba(0,0,0,.7);opacity:0;pointer-events:none;will-change:transform}' +
   '.eb i{display:block;height:100%;width:100%;transform-origin:left center;background:#e04c4c}' +
   '.eb.blue i{background:#4a8fe8}.eb.big{width:70px;height:8px;margin-left:-35px}' +
+  '.eb.locked{border-color:#ffd36b;box-shadow:0 0 0 1px #ffd36b,0 0 8px rgba(255,211,107,.8);height:8px}' +
   '#minimap{position:absolute;right:20px;top:12px;width:260px;height:26px;border:1px solid #3a4250;background:rgba(10,14,22,.7);pointer-events:none}' +
   '#kill-feed{position:absolute;right:20px;top:46px;display:flex;flex-direction:column;gap:3px;align-items:flex-end;pointer-events:none;font:12px/1.4 monospace}' +
   '#kill-feed div{padding:2px 8px;background:rgba(10,14,22,.7);border:1px solid #3a4250;color:#e8e6e0;opacity:0;transition:opacity .3s}' +

@@ -122,10 +122,12 @@ export class AimIndicator {
 // Ring under the locked target. Built once, parented lazily like AimIndicator.
 export class TargetMarker {
   constructor() {
-    this.mesh = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.86, 28),
-      new THREE.MeshBasicMaterial({ color: 0xff5a5a, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
+    this.mesh = new THREE.Mesh(new THREE.RingGeometry(0.7, 0.92, 28),
+      new THREE.MeshBasicMaterial({ color: 0xff5a5a, transparent: true, opacity: 0.95,
+        side: THREE.DoubleSide, depthWrite: false, depthTest: false }));
     this.mesh.rotation.x = -Math.PI / 2;
     this.mesh.position.y = 0.07;
+    this.mesh.renderOrder = 4;            // through the target's own body
     this.mesh.visible = false;
     this.attached = false;
     this.t = 0;

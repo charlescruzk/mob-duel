@@ -49,6 +49,9 @@ export default async function ({ block, restart, send, sleep }) {
       const g = window.__game, H = g.hero, E = g.enemy, T = g.fx.touch, t = window.__t; const r = {};
       r.tapSelectsTarget = T.target === E && T.stats.targets === 1;
       r.targetMarkerShown = T.marker.mesh.visible === true && Math.abs(T.marker.mesh.position.z - E.pos.z) < 0.2;
+      r.markerDrawsThroughBodies = T.marker.mesh.material.depthTest === false;
+      const bar = g.fx.enemyBars.bars.find((b) => b.unit === E);
+      r.enemyBarMarksLockedTarget = !!bar && bar.el.className.indexOf('locked') >= 0;
       r.lockedTargetTakesAutos = E.hp < E.maxHp;
       r.lockIgnoresCloserCreep = t.creep.hp === t.creep.maxHp;
       r.intentCarriesTargetId = H.intent.targetId === E.id;

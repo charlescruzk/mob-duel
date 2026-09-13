@@ -21,6 +21,7 @@ export function buildFx(base, world, hero) {
   const rigAnimator = new RigAnimator(world);
   const hitStop = new HitStop();
   const enemyBars = new EnemyBars(engine.camera, world, hero);
+  enemyBars.lockSource = touch;
   const minimap = new Minimap(world, hero);
   const killFeed = new KillFeed();
   const result = new ResultScreen();

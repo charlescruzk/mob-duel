@@ -9,6 +9,7 @@ const POOL = 24;
 export class EnemyBars {
   constructor(camera, world, playerHero) {
     this.camera = camera; this.world = world; this.player = playerHero;
+    this.lockSource = null;      // TouchControls: its `target` gets the gold frame
     this.bars = [];
     this.vec = new THREE.Vector3();
     this.w = 1; this.h = 1;
@@ -41,7 +42,8 @@ export class EnemyBars {
       const sx = (this.vec.x + 1) * 0.5 * this.w, sy = (1 - this.vec.y) * 0.5 * this.h;
       b.el.style.transform = 'translate(' + sx + 'px,' + sy + 'px)';
       b.el.style.opacity = '1';
-      const cls = 'eb' + (u.team === 'blue' ? ' blue' : '') + (u.kind === 'hero' ? ' big' : '');
+      const locked = this.lockSource && this.lockSource.target === u;
+      const cls = 'eb' + (u.team === 'blue' ? ' blue' : '') + (u.kind === 'hero' ? ' big' : '') + (locked ? ' locked' : '');
       if (cls !== b._cls) { b._cls = cls; b.el.className = cls; }
       const frac = Math.round((u.maxHp > 0 ? u.hp / u.maxHp : 0) * 100) / 100;
       if (frac !== b._frac) { b._frac = frac; b.fill.style.transform = 'scaleX(' + frac + ')'; }
