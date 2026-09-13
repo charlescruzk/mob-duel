@@ -8,7 +8,7 @@ export default async function ({ block, SETUP }) {
     H.teleport(0, 37); rig.setYaw(0); rig.snapTo(H.pos); step(0.5);
     const nx = 0, nz = 42;
     const d = Math.hypot(cam.position.x - nx, cam.position.z - nz);
-    const above = cam.position.y > 4 + 0.6 + 0.6;
+    const above = cam.position.y > 4 + 0.6 + 1.8 - 0.05;
     r.boomClearsNexusAtSpawn = d >= 2.0 + 0.9 - 0.05 || above;
     r.cameraRisesNotShrinks = rig.dist >= 5 && rig.pitchEff < rig.pitch - 0.1;
     H.teleport(0, 5); rig.snapTo(H.pos); step(1.0);

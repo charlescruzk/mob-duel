@@ -153,7 +153,7 @@ export class ThirdPersonCamera {
     const units = world.units;
     for (let i = 0; i < units.length; i++) {
       const u = units[i];
-      if (u.isStatic) this.occluders.push({ x: u.pos.x, z: u.pos.z, r: u.radius, h: (u.kind === 'nexus' ? HEIGHTS.nexus + 0.6 : HEIGHTS.tower) + 0.6 });
+      if (u.isStatic) this.occluders.push({ x: u.pos.x, z: u.pos.z, r: u.radius, h: (u.kind === 'nexus' ? HEIGHTS.nexus + 0.6 : HEIGHTS.tower) + 1.8 });   // well above the top so it leaves the frame
     }
   }
 
