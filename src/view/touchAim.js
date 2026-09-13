@@ -3,9 +3,44 @@
 // (dash/blink) default to the joystick direction. Manual: a drag vector in screen
 // space mapped onto the camera basis. A ground ring shows the manual aim point.
 import * as THREE from 'three';
+import { HEIGHTS } from '../sim/map/laneData.js';
 
 const AIM_MAX = 12.0;
 const near = [];   // scratch out-array for enemiesInRadius
+const proj = new THREE.Vector3();   // the one projection scratch for tap picking
+
+// Aim point on a locked target, clamped to AIM_MAX so abilities keep their reach
+// rules (the keyboard reticle is clamped the same way).
+export function aimAtTarget(hero, target, out) {
+  const dx = target.pos.x - hero.pos.x, dz = target.pos.z - hero.pos.z;
+  const d = Math.sqrt(dx * dx + dz * dz);
+  const k = d > AIM_MAX ? AIM_MAX / d : 1;
+  out.x = hero.pos.x + dx * k; out.z = hero.pos.z + dz * k;
+  return out;
+}
+
+// The enemy nearest a screen tap within radiusPx, heroes favoured on near ties.
+// Projects each candidate once into a module scratch: no allocation.
+export function pickTargetAt(camera, world, hero, sx, sy, radiusPx) {
+  const units = world.units;
+  const w = window.innerWidth, h = window.innerHeight;
+  let best = null, bestScore = Infinity;
+  for (let i = 0; i < units.length; i++) {
+    const u = units[i];
+    if (!u.alive || u.invulnerable || u.team === hero.team || u === hero) continue;
+    const top = u.kind === 'hero' ? HEIGHTS.hero * 0.6
+      : u.kind === 'tower' ? HEIGHTS.tower * 0.5
+      : u.kind === 'nexus' ? HEIGHTS.nexus * 0.5 : HEIGHTS.minion * 0.6;
+    proj.set(u.pos.x, u.pos.y + top, u.pos.z).project(camera);
+    if (proj.z > 1) continue;                       // behind the camera
+    const px = (proj.x + 1) * 0.5 * w, py = (1 - proj.y) * 0.5 * h;
+    const d = Math.sqrt((px - sx) * (px - sx) + (py - sy) * (py - sy));
+    if (d > radiusPx) continue;
+    const score = u.kind === 'hero' ? d * 0.55 : d;  // a hero behind a creep still wins
+    if (score < bestScore) { bestScore = score; best = u; }
+  }
+  return best;
+}
 
 export function assistedAim(world, hero, def, rig, joyX, joyZ, out) {
   const hx = hero.pos.x, hz = hero.pos.z;
@@ -82,4 +117,32 @@ export class AimIndicator {
     this.line.rotation.z = Math.atan2(-dx, -dz);
   }
   hide() { this.mesh.visible = false; this.line.visible = false; }
+}
+
+// Ring under the locked target. Built once, parented lazily like AimIndicator.
+export class TargetMarker {
+  constructor() {
+    this.mesh = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.86, 28),
+      new THREE.MeshBasicMaterial({ color: 0xff5a5a, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
+    this.mesh.rotation.x = -Math.PI / 2;
+    this.mesh.position.y = 0.07;
+    this.mesh.visible = false;
+    this.attached = false;
+    this.t = 0;
+  }
+  follow(hero, target, dt) {
+    if (!target) { this.hide(); return; }
+    if (!this.attached) {
+      const scene = hero.mesh && hero.mesh.parent;
+      if (!scene) return;
+      scene.add(this.mesh); this.attached = true;
+    }
+    this.t += dt;
+    const r = target.radius / 0.5;                 // ring is authored for a 0.5 m unit
+    const pulse = 1 + Math.sin(this.t * 6) * 0.06;
+    this.mesh.position.x = target.pos.x; this.mesh.position.z = target.pos.z;
+    this.mesh.scale.set(r * pulse, r * pulse, 1);
+    this.mesh.visible = true;
+  }
+  hide() { this.mesh.visible = false; }
 }

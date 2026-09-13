@@ -39,6 +39,14 @@ export class World {
   }
 
   // First alive-or-dead hero of a team, or null. Heroes persist while dead.
+  // Linear scan: the lane holds ~16 units, so this beats keeping a Map in sync.
+  unitById(id) {
+    if (!id) return null;
+    const list = this.units;
+    for (let i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+    return null;
+  }
+
   hero(team) {
     const list = this.units;
     for (let i = 0; i < list.length; i++) {

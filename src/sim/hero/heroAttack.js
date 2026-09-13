@@ -47,7 +47,10 @@ export class BasicAttack {
     }
     if (!intent || !intent.attack || this.timer > 0 || !world) return;
     if (hero.stunned || hero.isCasting) return;
-    const t = this.pickTarget(world, intent.aimX, intent.aimZ);
+    // A locked target (tap-to-target) wins while it is alive and in range; the
+    // reticle pick is the fallback, so nothing changes for keyboard play.
+    let t = this.lockedTarget(world, intent.targetId);
+    if (!t) t = this.pickTarget(world, intent.aimX, intent.aimZ);
     if (!t) return;
     if (hero.abilities.stealthed) hero.abilities.breakStealth();   // Veil ends on attack
     this.target = t;
@@ -66,6 +69,14 @@ export class BasicAttack {
     let d = Math.sqrt(dx * dx + dz * dz);
     if (u.isStatic) d -= u.radius;
     return d <= hero.attackRange + extra;
+  }
+
+  // The player's locked target, or null when it is gone, friendly or out of range.
+  lockedTarget(world, id) {
+    if (!id) return null;
+    const u = world.unitById(id);
+    if (!u || !u.alive || u.invulnerable || u.team === this.hero.team || u === this.hero) return null;
+    return this.inRange(u, 0) ? u : null;
   }
 
   // Among enemies in range, the one whose centre is nearest the reticle.

@@ -11,6 +11,8 @@
 //   recall       same edge rule as casts
 //   buy          -1 = nothing; 0..24 = item index (DESIGN.md §8 order). The shop
 //                consumes it on the rising edge (previous value was -1).
+//   targetId     0 = none; a unit id the player locked on (tap-to-target). Autos
+//                attack it while it lives and is in range; abilities aim at it.
 //   useItem      -1 = nothing; 0..5 = inventory slot (PHASE2.md §4). The consumables
 //                system consumes it on the rising edge, from anywhere.
 
@@ -24,6 +26,7 @@ export function makeIntent() {
     buy: -1,
     useItem: -1,
     sell: -1,
+    targetId: 0,
   };
 }
 
@@ -36,6 +39,7 @@ export function clearIntent(i) {
   i.buy = -1;
   i.useItem = -1;
   i.sell = -1;
+  i.targetId = 0;
   return i;
 }
 
@@ -45,7 +49,7 @@ export function copyIntent(dst, src) {
   dst.attack = src.attack;
   dst.q = src.q; dst.w = src.w; dst.e = src.e; dst.r = src.r;
   dst.recall = src.recall;
-  dst.buy = src.buy; dst.sell = src.sell;
+  dst.buy = src.buy; dst.sell = src.sell; dst.targetId = src.targetId;
   dst.useItem = src.useItem;
   return dst;
 }

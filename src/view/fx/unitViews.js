@@ -68,6 +68,10 @@ export class UnitViews {
     for (let i = 0; i < list.length; i++) {
       const v = list[i];
       const u = v.unit;
+      // A pooled minion respawns in place (no 'unitAdded'), and online units come
+      // back alive straight from a snapshot: either way the death sink left the mesh
+      // hidden, so anything alive and in a world is shown again here.
+      if (u.alive && u.world && !v.mesh.visible) { v.mesh.visible = true; if (v.rig) v.rig.deadT = 0; }
       if (u.kind !== 'hero') continue;
       if (v.shield) v.shield.visible = u.alive && u.shield > 0;
       const stealthOn = !!u.stealthed;

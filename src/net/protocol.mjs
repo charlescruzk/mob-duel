@@ -21,6 +21,7 @@ export function sanitizeIntent(raw, out) {
   out.buy = intIn(raw.buy, -1, 63);
   out.useItem = intIn(raw.useItem, -1, 5);
   out.sell = intIn(raw.sell, -1, 5);
+  out.targetId = intIn(raw.targetId, 0, 1e6);
   return out;
 }
 

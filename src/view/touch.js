@@ -4,15 +4,17 @@
 // aim by dragging a skill. HeroController calls applyIntent() at the end of its
 // update so touch overrides the keyboard fields in the same frame the sim reads.
 import { buildTouchUi, setButtonState } from './touchUi.js';
-import { assistedAim, manualAim, AimIndicator } from './touchAim.js';
+import { assistedAim, manualAim, aimAtTarget, pickTargetAt, AimIndicator, TargetMarker } from './touchAim.js';
 
 const DEAD = 0.14;                 // joystick dead zone (fraction of radius)
 const DRAG_PX = 18;                // finger travel that turns a tap into manual aim
 const FULL_PX = 70;                // drag length meaning "full range"
 const LOOK_SENS = 2.2;             // touch look is slower than a mouse
 const AIM_HOLD = 0.6;              // seconds the cast aim stays pinned (wind-ups resolve later)
-const FOLLOW_RATE = 2.4;           // rad/s the camera turns toward the walk direction
-const FOLLOW_AFTER = 1.2;          // seconds after the last look drag before auto-follow
+const TAP_MS = 260;                // press-and-release inside this is a tap, not a drag
+const TAP_PX = 14;
+const TAP_RADIUS = 90;             // CSS px around a tap that can claim a unit
+const JOY_SHOW_PX = 8;             // the stick only appears once the thumb actually moves
 const SLOTS = ['q', 'w', 'e', 'r'];
 const scratch = { x: 0, z: 0 };
 
@@ -27,13 +29,18 @@ export class TouchControls {
     this.onPause = null;
     // joystick / look pointers
     this.joyId = -1; this.joyX = 0; this.joyY = 0; this.jx = 0; this.jz = 0;   // jx/jz world-space
-    this.lookId = -1; this.lookX = 0; this.lookY = 0; this.sinceLook = 99;
+    this.lookId = -1; this.lookX = 0; this.lookY = 0;
+    // Tap bookkeeping, shared by both zones: a short press that never travels is a
+    // target tap, so the left stick stays movement-only and the right stays camera-only.
+    this.tap = { id: -1, x: 0, y: 0, t: 0 };
+    this.target = null;
+    this.marker = null;
     // buttons: held state and the pending one-frame edges
     this.attackHeld = false;
     this.pending = { q: false, w: false, e: false, r: false, recall: false, useItem: -1, shop: false };
     this.aimHold = 0; this.aimX = 0; this.aimZ = 0;
     this.drag = { id: -1, slot: '', x0: 0, y0: 0, dx: 0, dy: 0, manual: false };
-    this.stats = { taps: 0, casts: 0, manualCasts: 0 };
+    this.stats = { taps: 0, casts: 0, manualCasts: 0, targets: 0 };
     this.portrait = false;
     if (typeof window === 'undefined') return;
     const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
@@ -49,6 +56,7 @@ export class TouchControls {
     document.body.classList.add('touch');
     this.ui = buildTouchUi();
     this.aimIndicator = new AimIndicator();
+    this.marker = new TargetMarker();
     this._bind();
     this._orient();
     window.addEventListener('resize', () => this._orient());
@@ -93,12 +101,35 @@ export class TouchControls {
     this.joyId = e.pointerId; this.joyX = e.clientX; this.joyY = e.clientY;
     this.ui.joy.style.transform = 'translate(' + e.clientX + 'px,' + e.clientY + 'px)';
     this.ui.knob.style.transform = 'translate(0px,0px)';
-    this.ui.joy.classList.add('on');
+    this._markTap(e);
   }
 
   _lookStart(e) {
     if (this.lookId >= 0) return;
     this.lookId = e.pointerId; this.lookX = e.clientX; this.lookY = e.clientY;
+    this._markTap(e);
+  }
+
+  _markTap(e) {
+    const t = this.tap;
+    t.id = e.pointerId; t.x = e.clientX; t.y = e.clientY; t.t = performance.now();
+  }
+
+  // True when this pointer went down and up in one spot, quickly.
+  _wasTap(e) {
+    const t = this.tap;
+    if (t.id !== e.pointerId) return false;
+    t.id = -1;
+    const dx = e.clientX - t.x, dy = e.clientY - t.y;
+    return performance.now() - t.t < TAP_MS && Math.sqrt(dx * dx + dy * dy) < TAP_PX;
+  }
+
+  // Tap in the world: lock the enemy under the finger, or clear the lock.
+  _pick(x, y) {
+    if (!this.world || !this.hero || !this.rig) return;
+    const u = pickTargetAt(this.rig.camera, this.world, this.hero, x, y, TAP_RADIUS);
+    this.target = u || null;
+    this.stats.targets += u ? 1 : 0;
   }
 
   _skillDown(slot, e) {
@@ -116,6 +147,7 @@ export class TouchControls {
       const k = len > radius ? radius / len : 1;
       dx *= k; dy *= k;
       this.ui.knob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+      if (len > JOY_SHOW_PX) this.ui.joy.classList.add('on');
       const f = len / radius;
       if (f < DEAD) { this.jx = 0; this.jz = 0; return; }
       // Screen up = camera forward; screen right = camera right.
@@ -131,7 +163,6 @@ export class TouchControls {
       this.input.mouseDX += (e.clientX - this.lookX) * LOOK_SENS;
       this.input.mouseDY += (e.clientY - this.lookY) * LOOK_SENS;
       this.lookX = e.clientX; this.lookY = e.clientY;
-      this.sinceLook = 0;
       e.preventDefault();
     } else if (e.pointerId === this.drag.id) {
       const d = this.drag;
@@ -143,8 +174,13 @@ export class TouchControls {
 
   _up(e) {
     if (e.pointerType !== 'touch') return;
-    if (e.pointerId === this.joyId) { this.joyId = -1; this.jx = 0; this.jz = 0; this.ui.joy.classList.remove('on'); }
-    else if (e.pointerId === this.lookId) { this.lookId = -1; }
+    if (e.pointerId === this.joyId) {
+      this.joyId = -1; this.jx = 0; this.jz = 0; this.ui.joy.classList.remove('on');
+      if (this._wasTap(e)) this._pick(e.clientX, e.clientY);
+    } else if (e.pointerId === this.lookId) {
+      this.lookId = -1;
+      if (this._wasTap(e)) this._pick(e.clientX, e.clientY);
+    }
     else if (e.pointerId === this.drag.id) {
       const d = this.drag;
       const b = this.ui.skills[d.slot];
@@ -161,6 +197,7 @@ export class TouchControls {
     if (!this.hero || !this.rig) return;
     const def = this.hero.data.abilities[slot];
     if (manual) manualAim(this.hero, def, this.rig, dx, dy, FULL_PX, scratch);
+    else if (this._locked()) aimAtTarget(this.hero, this.target, scratch);
     else assistedAim(this.world, this.hero, def, this.rig, this.jx, this.jz, scratch);
     this.aimX = scratch.x; this.aimZ = scratch.z; this.aimHold = AIM_HOLD;
     this.pending[slot] = true;
@@ -177,26 +214,24 @@ export class TouchControls {
     if (p.useItem >= 0) intent.useItem = p.useItem;
     if (p.shop) { this.input._just.add('KeyP'); }     // the shop panel listens for the key
     p.q = p.w = p.e = p.r = p.recall = false; p.useItem = -1; p.shop = false;
+    intent.targetId = this._locked() ? this.target.id : 0;
     if (this.aimHold > 0) { intent.aimX = this.aimX; intent.aimZ = this.aimZ; }
-    else if (this.attackHeld && this.hero && this.world) {
+    else if (this._locked()) {
+      aimAtTarget(this.hero, this.target, scratch);
+      intent.aimX = scratch.x; intent.aimZ = scratch.z;
+    } else if (this.attackHeld && this.hero && this.world) {
       assistedAim(this.world, this.hero, null, rig, this.jx, this.jz, scratch);
       intent.aimX = scratch.x; intent.aimZ = scratch.z;
     }
   }
 
+  _locked() { const t = this.target; return !!(t && t.alive && t.world && !t.invulnerable); }
+
   update(dt) {
     if (!this.active || !this.hero) return;
     if (this.aimHold > 0) { this.aimHold -= dt; if (this.aimHold < 0) this.aimHold = 0; }
-    this.sinceLook += dt;
-    // Camera auto-follow: while walking and not looking around, turn toward the walk.
-    if (this.rig && this.joyId >= 0 && this.sinceLook > FOLLOW_AFTER && (this.jx !== 0 || this.jz !== 0)) {
-      const want = Math.atan2(-this.jx, -this.jz);
-      let d = want - this.rig.yaw;
-      while (d > Math.PI) d -= Math.PI * 2;
-      while (d < -Math.PI) d += Math.PI * 2;
-      const step = FOLLOW_RATE * dt;
-      this.rig.setYaw(this.rig.yaw + (Math.abs(d) < step ? d : Math.sign(d) * step));
-    }
+    if (this.target && !this._locked()) this.target = null;   // it died or left
+    if (this.marker) this.marker.follow(this.hero, this._locked() ? this.target : null, dt);
     // Manual aim indicator follows the finger.
     const d = this.drag;
     if (d.manual && this.aimIndicator) {
@@ -225,6 +260,10 @@ export class TouchControls {
     location.search = s.toString();
   }
 
-  reset() { this.attackHeld = false; this.aimHold = 0; this.jx = 0; this.jz = 0; }
+  reset() {
+    this.attackHeld = false; this.aimHold = 0; this.jx = 0; this.jz = 0;
+    this.target = null;
+    if (this.marker) this.marker.hide();
+  }
   dispose() {}
 }
