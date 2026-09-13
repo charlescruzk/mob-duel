@@ -24,6 +24,7 @@ const spawnScratch = { x: 0, y: 0, z: 0 };
 const minionOpts = { ranged: false, wave: 0 };
 const payloads = {};             // reused per event name
 const ID_KEYS = ['hero', 'unit', 'source', 'target'];
+const ZERO3 = [0, 0, 0], ZERO4 = [0, 0, 0, 0], ZERO7 = [0, 0, 0, 0, 0, 0, 0];
 
 export class MirrorWorld {
   constructor() {
@@ -80,8 +81,9 @@ export class MirrorWorld {
       seen.add(o.id);
       this._applyUnit(u, o);
     }
-    // Units the server dropped (dead minions) leave the local world too.
-    for (const [id, u] of this.byId) {
+    // Units the server dropped (dead minions) leave the local world too — only a
+    // full snapshot can say that; partial ones carry heroes alone.
+    if (!s.partial) for (const [id, u] of this.byId) {
       if (seen.has(id)) continue;
       this.byId.delete(id);
       this.targets.delete(u);
@@ -129,19 +131,27 @@ export class MirrorWorld {
         if (ex !== 0 || ez !== 0) this.corrections++;
       }
     } else if (Math.abs(u.pos.x - o.x) > SNAP_DIST || Math.abs(u.pos.z - o.z) > SNAP_DIST) { u.pos.x = o.x; u.pos.z = o.z; u.prevPos.copy(u.pos); }
-    u.hp = o.hp; u.maxHp = o.mhp; u.shield = o.sh; u.alive = o.a === 1; u.invulnerable = o.inv === 1;
-    if (o.k === 'minion') { u.stunTimer = o.st[0]; u.slowTimer = o.st[1]; u.slowPct = o.st[2]; u.rootTimer = o.st[3]; u.wave = o.wv; return; }
+    u.hp = o.hp; u.maxHp = o.mhp; u.shield = o.sh || 0; u.alive = o.d !== 1; u.invulnerable = o.inv === 1;
+    if (o.k === 'minion') {
+      const st = o.st || ZERO4;
+      u.stunTimer = st[0]; u.slowTimer = st[1]; u.slowPct = st[2]; u.rootTimer = st[3]; u.wave = o.wv;
+      return;
+    }
     if (o.k !== 'hero') return;
     const ab = u.abilities, at = u.attack;
     u.level = o.lv; u.xp = o.xp; u.mp = o.mp; u.maxMp = o.mmp; u.gold = o.g;
     u.cooldowns.q = o.cd[0]; u.cooldowns.w = o.cd[1]; u.cooldowns.e = o.cd[2]; u.cooldowns.r = o.cd[3];
-    ab.stunTimer = o.st[0]; ab.slowTimer = o.st[1]; ab.slowPct = o.st[2]; ab.rootTimer = o.st[3];
-    ab.stealthTimer = o.st[4]; ab.hasteTimer = o.st[5]; ab.shieldTimer = o.st[6];
-    at.timer = o.atk[0]; at.windup = o.atk[1]; at.target = o.atk[2] ? (this.byId.get(o.atk[2]) || null) : null;
-    ab.cast.slot = o.cast[0]; ab.cast.timer = o.cast[1]; ab.cast.def = o.cast[0] ? u.data.abilities[o.cast[0]] : null;
-    ab.dash.active = o.dash[0] === 1; ab.dash.dx = o.dash[1]; ab.dash.dz = o.dash[2];
-    u.isRecalling = o.rc[0] === 1; u.recallTimer = o.rc[1];
-    u.respawnTimer = o.rs;
+    const st = o.st || ZERO7;
+    ab.stunTimer = st[0]; ab.slowTimer = st[1]; ab.slowPct = st[2]; ab.rootTimer = st[3];
+    ab.stealthTimer = st[4]; ab.hasteTimer = st[5]; ab.shieldTimer = st[6];
+    const atk = o.atk || ZERO3;
+    at.timer = atk[0]; at.windup = atk[1]; at.target = atk[2] ? (this.byId.get(atk[2]) || null) : null;
+    if (o.cast) { ab.cast.slot = o.cast[0]; ab.cast.timer = o.cast[1]; ab.cast.def = u.data.abilities[o.cast[0]] || null; }
+    else { ab.cast.slot = ''; ab.cast.timer = 0; ab.cast.def = null; }
+    if (o.dash) { ab.dash.active = true; ab.dash.dx = o.dash[1]; ab.dash.dz = o.dash[2]; }
+    else ab.dash.active = false;
+    u.isRecalling = !!o.rc; u.recallTimer = o.rc ? o.rc[1] : 0;
+    u.respawnTimer = o.rs || 0;
     u.kills = o.ks; u.deaths = o.ds;
     this._applyItems(u, o.it, o.ic);
   }

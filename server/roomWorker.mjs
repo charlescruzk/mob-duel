@@ -65,10 +65,13 @@ function loop() {
 
 function emitSnapshot() {
   const w = g.world;
-  const units = new Array(w.units.length);
-  for (let i = 0; i < w.units.length; i++) units[i] = encodeUnit(w.units[i]);
+  // Heroes, effects and events go every tick; minions and structures every other
+  // tick (a 'partial' snapshot never removes units on the client).
+  const partial = (tick & 1) === 1;
+  const units = [];
+  for (let i = 0; i < w.units.length; i++) if (!partial || w.units[i].kind === 'hero') units.push(encodeUnit(w.units[i]));
   const snap = {
-    t: 'snap', tick, time: Math.round(w.time * 100) / 100, state: g.match.state,
+    t: 'snap', tick, partial: partial ? 1 : 0, time: Math.round(w.time * 100) / 100, state: g.match.state,
     cd: Math.round(g.match.countdown * 100) / 100, winner: g.match.winner, ack: [appliedTick[0], appliedTick[1]],
     u: units, fx: encodeEffects(effects), ev: eventLog.length ? eventLog.slice() : [],
   };

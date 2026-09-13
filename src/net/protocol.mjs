@@ -32,24 +32,29 @@ export function isRoomCode(s) { return typeof s === 'string' && /^[A-Z]{4}$/.tes
 
 // Snapshot of one unit. Heroes carry everything the HUD, animator and ability bar read.
 export function encodeUnit(u) {
-  const o = {
-    id: u.id, k: u.kind, tm: u.team, x: r2(u.pos.x), z: r2(u.pos.z), f: r2(u.facing),
-    hp: r1(u.hp), mhp: r1(u.maxHp), sh: r1(u.shield), a: u.alive ? 1 : 0, inv: u.invulnerable ? 1 : 0,
-  };
-  if (u.kind === 'minion') { o.rg = u.ranged ? 1 : 0; o.wv = u.wave; o.st = [r2(u.stunTimer), r2(u.slowTimer), r2(u.slowPct), r2(u.rootTimer)]; }
-  else if (u.kind === 'hero') {
+  // Zero-valued optional fields are omitted; the mirror treats absence as zero.
+  const o = { id: u.id, k: u.kind, tm: u.team, x: r2(u.pos.x), z: r2(u.pos.z), f: r2(u.facing), hp: r1(u.hp), mhp: r1(u.maxHp) };
+  if (u.shield > 0) o.sh = r1(u.shield);
+  if (!u.alive) o.d = 1;
+  if (u.invulnerable) o.inv = 1;
+  if (u.kind === 'minion') {
+    o.rg = u.ranged ? 1 : 0; o.wv = u.wave;
+    if (u.stunTimer > 0 || u.slowTimer > 0 || u.rootTimer > 0) o.st = [r2(u.stunTimer), r2(u.slowTimer), r2(u.slowPct), r2(u.rootTimer)];
+  } else if (u.kind === 'hero') {
     const ab = u.abilities, at = u.attack;
     o.hk = u.heroKey; o.lv = u.level; o.xp = r1(u.xp); o.mp = r1(u.mp); o.mmp = r1(u.maxMp); o.g = Math.round(u.gold);
     o.cd = [r2(u.cooldowns.q), r2(u.cooldowns.w), r2(u.cooldowns.e), r2(u.cooldowns.r)];
-    o.st = [r2(ab.stunTimer), r2(ab.slowTimer), r2(ab.slowPct), r2(ab.rootTimer), r2(ab.stealthTimer), r2(ab.hasteTimer), r2(ab.shieldTimer)];
-    o.atk = [r2(at.timer), r2(at.windup), at.target ? at.target.id : 0];
-    o.cast = [ab.cast.slot, r2(ab.cast.timer)];
-    o.dash = [ab.dash.active ? 1 : 0, r2(ab.dash.dx), r2(ab.dash.dz)];
-    o.rc = [u.isRecalling ? 1 : 0, r2(u.recallTimer)];
-    o.rs = r2(u.respawnTimer);
+    if (ab.stunTimer > 0 || ab.slowTimer > 0 || ab.rootTimer > 0 || ab.stealthTimer > 0 || ab.hasteTimer > 0 || ab.shieldTimer > 0) {
+      o.st = [r2(ab.stunTimer), r2(ab.slowTimer), r2(ab.slowPct), r2(ab.rootTimer), r2(ab.stealthTimer), r2(ab.hasteTimer), r2(ab.shieldTimer)];
+    }
+    if (at.timer > 0 || at.windup > 0 || at.target) o.atk = [r2(at.timer), r2(at.windup), at.target ? at.target.id : 0];
+    if (ab.cast.def) o.cast = [ab.cast.slot, r2(ab.cast.timer)];
+    if (ab.dash.active) o.dash = [1, r2(ab.dash.dx), r2(ab.dash.dz)];
+    if (u.isRecalling) o.rc = [1, r2(u.recallTimer)];
+    if (!u.alive) o.rs = r2(u.respawnTimer);
     o.it = u.items ? u.items.map((it) => it.index) : [];
     o.ic = u.items ? u.items.map((it) => it.count || 0) : [];
-    o.ks = u.kills | 0; o.ds = u.deaths | 0; o.lh = u.lastHits | 0;
+    o.ks = u.kills | 0; o.ds = u.deaths | 0;
   }
   return o;
 }

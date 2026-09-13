@@ -17,6 +17,8 @@ export function wireStartGate(base, controller, shopPanel) {
     hud.showReticle(!touch.active);
   };
   if (overlay) overlay.addEventListener('click', start);
+  // Touch menu button: raise the overlay as the pause screen.
+  touch.onPause = () => { if (overlay) overlay.classList.remove('hidden'); controller.enabled = false; };
   input.onLockChange = (locked) => {
     if (touch.active) return;
     if (!locked && started && overlay && !shopPanel.open) {

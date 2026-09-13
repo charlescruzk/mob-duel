@@ -13,6 +13,7 @@ export class Input {
     this.mouseDX = 0;
     this.mouseDY = 0;
     this.locked = false;
+    this.touchLook = false;      // set by TouchControls: look deltas arrive without pointer lock
     // Toggled when pointer lock changes; main.js uses it to show/hide the overlay.
     this.onLockChange = null;
 

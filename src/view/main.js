@@ -79,6 +79,7 @@ function boot() {
 
   const camera = new ThirdPersonCamera(engine.camera, input);
   const controller = new HeroController(input, camera);
+  controller.touch = touch;
   controller.enabled = false;
   const hud = new Hud();
 

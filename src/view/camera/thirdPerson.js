@@ -60,7 +60,7 @@ export class ThirdPersonCamera {
 
   update(dt, targetPos) {
     const inp = this.input;
-    if (inp && inp.locked) {
+    if (inp && (inp.locked || inp.touchLook)) {   // touch drags write mouseDX without a lock
       this.yaw -= inp.mouseDX * YAW_SENS;
       this.pitch -= inp.mouseDY * PITCH_SENS;
       if (this.pitch < PITCH_MIN) this.pitch = PITCH_MIN;

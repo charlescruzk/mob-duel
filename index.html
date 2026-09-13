@@ -2,13 +2,16 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <title>moba-duel</title>
   <style>
     html, body { margin: 0; height: 100%; background: #000; overflow: hidden;
                  font-family: system-ui, -apple-system, Segoe UI, sans-serif; color: #fff;
                  user-select: none; }
-    #game-canvas { display: block; width: 100vw; height: 100vh; }
+    #game-canvas { display: block; width: 100vw; height: 100vh; height: 100dvh; touch-action: none; }
+    body.touch #hero-select .hs-grid { grid-template-columns: repeat(3, minmax(150px, 220px)); gap: 8px; }
+    body.touch #hero-select .hs-card { padding: 8px; font-size: 11px; }
+    body.touch #start-overlay .ctl { display: none; }
 
     /* --- start gate --- */
     #start-overlay { position: fixed; inset: 0; display: flex; flex-direction: column;

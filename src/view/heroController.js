@@ -10,6 +10,7 @@ export class HeroController {
     this.input = input;
     this.rig = cameraRig;
     this.enabled = true;          // false while the overlay is up: intent stays cleared
+    this.touch = null;            // TouchControls: overrides the keyboard fields when active
   }
 
   // heroPos: the driven hero's position (used to clamp the aim point). Writes into
@@ -64,6 +65,7 @@ export class HeroController {
     if (d > AIM_MAX) { ax *= AIM_MAX / d; az *= AIM_MAX / d; }
     intent.aimX = hx + ax;
     intent.aimZ = hz + az;
+    if (this.touch && this.touch.active) this.touch.applyIntent(intent, heroPos, rig);
     return intent;
   }
 }
