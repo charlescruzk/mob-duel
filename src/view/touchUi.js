@@ -38,7 +38,7 @@ const CSS =
   '#rotate-prompt{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;background:#0b0e16;color:#e8e6e0;font:700 16px/1.6 monospace;letter-spacing:.08em;text-align:center}' +
   'body.touch.portrait #rotate-prompt{display:flex}';
 
-const SKILLS = ['q', 'w', 'e', 'r'];
+export const SKILLS = ['q', 'w', 'e', 'r'];
 
 export function buildTouchUi() {
   if (typeof document === 'undefined') return null;
@@ -91,4 +91,21 @@ export function setButtonState(b, frac, seconds, dim, name) {
   const cls = dim ? 'dim' : '';
   if (cls !== b._cls) { b._cls = cls; b.el.classList.toggle('dim', dim); }
   if (name !== undefined && name !== b.sub.textContent) b.sub.textContent = name;
+}
+
+// Per-frame button refresh: cooldown sweeps, remaining seconds, dim when unusable.
+// Touches the DOM only where a value actually changed.
+export function refreshButtons(ui, hero) {
+  for (let i = 0; i < SKILLS.length; i++) {
+    const slot = SKILLS[i];
+    const def = hero.data.abilities[slot];
+    const cd = hero.cooldowns ? hero.cooldowns[slot] : 0;
+    const total = def.cd * (1 - (hero.cdr || 0)) || 1;
+    const state = hero.abilityState ? hero.abilityState(slot) : 'ready';
+    setButtonState(ui.skills[slot], cd > 0 ? cd / total : 0, cd, !hero.alive || state === 'locked' || state === 'mana');
+  }
+  setButtonState(ui.atk, 0, 0, !hero.alive);
+  setButtonState(ui.rec, 0, 0, !hero.alive || hero.isRecalling);
+  const pot = hero.items && hero.items[0] && hero.items[0].consumable ? hero.items[0] : null;
+  setButtonState(ui.pot, 0, 0, !pot || !hero.alive, pot ? 'x' + (pot.count || 1) : 'potion');
 }

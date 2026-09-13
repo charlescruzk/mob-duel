@@ -7,6 +7,7 @@ export class PauseMenu {
   constructor(overlay, audio, touch) {
     this.overlay = overlay;
     this.audio = audio;
+    this.touch = touch;
     this.room = '';
     if (!overlay) return;
     ensureHudStyles();
@@ -29,6 +30,13 @@ export class PauseMenu {
     vol.addEventListener('click', stop);
     vol.addEventListener('input', (e) => { stop(e); if (this.audio) this.audio.setVolume(Number(vol.value) / 100); });
     row.appendChild(vol);
+    // Every big mobile MOBA exposes this: holding attack walks you into range.
+    this.pursue = this._button(row, (touch && touch.pursuit === false) ? 'PURSUIT: OFF' : 'PURSUIT: ON', () => {
+      if (!this.touch) return;
+      this.touch.setPursuit(!this.touch.pursuit);
+      this.pursue.textContent = this.touch.pursuit ? 'PURSUIT: ON' : 'PURSUIT: OFF';
+    });
+    this.pursue.className = 'pm-touch';
     this.change = this._button(row, 'CHANGE HERO', () => {
       const q = new URLSearchParams(location.search);
       q.delete('hero'); q.delete('enemy'); q.delete('room'); q.delete('solo');

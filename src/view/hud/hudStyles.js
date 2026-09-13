@@ -11,6 +11,7 @@ const CSS =
   '.lb-hint{width:100%;text-align:center;color:#8f8d86;font-size:11px}' +
   '.pm-row{display:flex;gap:10px;margin-top:16px;align-items:center;justify-content:center;flex-wrap:wrap;font:11px/1 monospace;color:#8f8d86}' +
   '.pm-row input[type=range]{width:110px}' +
+  '.pm-row .pm-touch{display:none}body.touch .pm-row .pm-touch{display:inline-block}' +
   '#result-screen{position:fixed;inset:0;z-index:12;display:none;align-items:center;justify-content:center;background:rgba(6,8,14,.78);color:#e8e6e0;font:13px/1.6 monospace}' +
   '#result-screen.show{display:flex}' +
   '#result-screen .rs-box{min-width:320px;padding:22px 28px;border:1px solid #3a4250;background:rgba(14,18,28,.96);text-align:center;border-radius:6px}' +

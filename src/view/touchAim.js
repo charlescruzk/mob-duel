@@ -86,6 +86,39 @@ export function manualAim(hero, def, rig, dx, dy, px, out) {
   return out;
 }
 
+// The enemy closest to a world-space aim point, used by the drag-the-attack-button
+// lock (Wild Rift / Honor of Kings drag targeting): the finger stays on the button
+// and the drag direction chooses the unit.
+export function pickTargetNear(world, hero, x, z, radius) {
+  const units = world.units;
+  let best = null, bestScore = Infinity;
+  for (let i = 0; i < units.length; i++) {
+    const u = units[i];
+    if (!u.alive || u.invulnerable || u.team === hero.team || u === hero) continue;
+    const dx = u.pos.x - x, dz = u.pos.z - z;
+    const d = Math.sqrt(dx * dx + dz * dz);
+    if (d > radius) continue;
+    const score = u.kind === 'hero' ? d * 0.55 : d;
+    if (score < bestScore) { bestScore = score; best = u; }
+  }
+  return best;
+}
+
+// Steering for "close pursuit": the unit vector toward `target` when it is out of
+// attack range but within `extra` metres of it, else null. Mirrors what Mobile
+// Legends, Honor of Kings and Wild Rift do when you hold attack: walk in, but only
+// a short way. Writes `out`; returns true when it steered.
+export function pursueDirection(hero, target, extra, stop, out) {
+  const dx = target.pos.x - hero.pos.x, dz = target.pos.z - hero.pos.z;
+  const d = Math.sqrt(dx * dx + dz * dz);
+  if (d < 1e-4) return false;
+  const reach = hero.attackRange + (target.isStatic ? target.radius : 0);
+  if (d <= reach - stop) return false;          // already close enough to swing
+  if (d > reach + extra) return false;          // too far: no cross-lane chases
+  out.x = dx / d; out.z = dz / d;
+  return true;
+}
+
 // Ground ring shown while aiming manually. Built once, parented to the hero mesh's
 // scene lazily (the touch layer never receives the scene directly).
 export class AimIndicator {

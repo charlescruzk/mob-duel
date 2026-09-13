@@ -3,8 +3,9 @@
 // drag (the rest, outside buttons), the attack/skill/utility buttons, and manual
 // aim by dragging a skill. HeroController calls applyIntent() at the end of its
 // update so touch overrides the keyboard fields in the same frame the sim reads.
-import { buildTouchUi, setButtonState } from './touchUi.js';
-import { assistedAim, manualAim, aimAtTarget, pickTargetAt, AimIndicator, TargetMarker } from './touchAim.js';
+import { buildTouchUi, refreshButtons, SKILLS as SLOTS } from './touchUi.js';
+import { bindPointers } from './touchBind.js';
+import { assistedAim, manualAim, aimAtTarget, pickTargetAt, pickTargetNear, pursueDirection, AimIndicator, TargetMarker } from './touchAim.js';
 
 const DEAD = 0.14;                 // joystick dead zone (fraction of radius)
 const DRAG_PX = 18;                // finger travel that turns a tap into manual aim
@@ -15,7 +16,13 @@ const TAP_MS = 260;                // press-and-release inside this is a tap, no
 const TAP_PX = 14;
 const TAP_RADIUS = 90;             // CSS px around a tap that can claim a unit
 const JOY_SHOW_PX = 8;             // the stick only appears once the thumb actually moves
-const SLOTS = ['q', 'w', 'e', 'r'];
+// Pursuit, as every big mobile MOBA does it: holding attack walks you into range of
+// the target, but only a short way (Mobile Legends' "Close Pursuit", Honor of Kings'
+// "Auto Chase Distance: Close-Range"), and the movement stick always wins (Mobile
+// Legends' "Moving Pursuit off"). Wild Rift does the same auto-follow on attack.
+const PURSUE_EXTRA = 5.0;          // metres past attack range we are willing to walk
+const PURSUE_STOP = 0.35;          // stop this far inside range so attacks do not drop
+const PURSUIT_KEY = 'mobaDuel.pursuit';
 const scratch = { x: 0, z: 0 };
 
 export class TouchControls {
@@ -35,12 +42,16 @@ export class TouchControls {
     this.tap = { id: -1, x: 0, y: 0, t: 0 };
     this.target = null;
     this.marker = null;
+    this.pursuit = true;           // toggled in the pause menu, like the games above
+    this.pursuing = false;         // true on frames where pursuit is steering
+    try { this.pursuit = localStorage.getItem(PURSUIT_KEY) !== '0'; } catch { /* storage blocked */ }
+    this.atkDrag = { id: -1, x0: 0, y0: 0, on: false };
     // buttons: held state and the pending one-frame edges
     this.attackHeld = false;
     this.pending = { q: false, w: false, e: false, r: false, recall: false, useItem: -1, shop: false };
     this.aimHold = 0; this.aimX = 0; this.aimZ = 0;
     this.drag = { id: -1, slot: '', x0: 0, y0: 0, dx: 0, dy: 0, manual: false };
-    this.stats = { taps: 0, casts: 0, manualCasts: 0, targets: 0 };
+    this.stats = { taps: 0, casts: 0, manualCasts: 0, targets: 0, dragLocks: 0 };
     this.portrait = false;
     if (typeof window === 'undefined') return;
     const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
@@ -57,7 +68,7 @@ export class TouchControls {
     this.ui = buildTouchUi();
     this.aimIndicator = new AimIndicator();
     this.marker = new TargetMarker();
-    this._bind();
+    bindPointers(this);
     this._orient();
     window.addEventListener('resize', () => this._orient());
   }
@@ -68,33 +79,6 @@ export class TouchControls {
   }
 
   _orient() { this.portrait = window.innerHeight > window.innerWidth; document.body.classList.toggle('portrait', this.portrait); }
-
-  _bind() {
-    const ui = this.ui;
-    const opts = { passive: false };
-    const down = (e) => this._down(e), move = (e) => this._move(e), up = (e) => this._up(e);
-    ui.move.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'touch') return; e.preventDefault(); this._joyStart(e); }, opts);
-    ui.look.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'touch') return; e.preventDefault(); this._lookStart(e); }, opts);
-    window.addEventListener('pointermove', move, opts);
-    window.addEventListener('pointerup', up, opts);
-    window.addEventListener('pointercancel', up, opts);
-    const bindBtn = (b, onDown, onUp) => {
-      b.el.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'touch') return; e.preventDefault(); e.stopPropagation(); b.el.classList.add('press'); onDown(e); }, opts);
-      const rel = (e) => { b.el.classList.remove('press'); if (onUp) onUp(e); };
-      b.el.addEventListener('pointerup', rel, opts);
-      b.el.addEventListener('pointercancel', rel, opts);
-    };
-    bindBtn(ui.atk, () => { this.attackHeld = true; this.stats.taps++; }, () => { this.attackHeld = false; });
-    for (let i = 0; i < SLOTS.length; i++) {
-      const slot = SLOTS[i];
-      bindBtn(ui.skills[slot], (e) => this._skillDown(slot, e), null);
-    }
-    bindBtn(ui.rec, () => { this.pending.recall = true; });
-    bindBtn(ui.pot, () => { this.pending.useItem = 0; });
-    bindBtn(ui.shop, () => { this.pending.shop = true; });
-    bindBtn(ui.menu, () => { if (this.onPause) this.onPause(); });
-    void down;
-  }
 
   _joyStart(e) {
     if (this.joyId >= 0) return;
@@ -164,6 +148,18 @@ export class TouchControls {
       this.input.mouseDY += (e.clientY - this.lookY) * LOOK_SENS;
       this.lookX = e.clientX; this.lookY = e.clientY;
       e.preventDefault();
+    } else if (e.pointerId === this.atkDrag.id) {
+      // Drag the attack button toward a unit to lock it, as Wild Rift and Honor of
+      // Kings do: the direction picks the target, the finger never leaves the button.
+      const a = this.atkDrag;
+      const dx = e.clientX - a.x0, dy = e.clientY - a.y0;
+      if (Math.sqrt(dx * dx + dy * dy) > DRAG_PX && this.hero && this.rig && this.world) {
+        if (!a.on) { a.on = true; this.ui.atk.el.classList.add('aiming'); }
+        manualAim(this.hero, null, this.rig, dx, dy, FULL_PX, scratch);
+        const u = pickTargetNear(this.world, this.hero, scratch.x, scratch.z, 3.5);
+        if (u && u !== this.target) { this.target = u; this.stats.dragLocks++; }
+      }
+      e.preventDefault();
     } else if (e.pointerId === this.drag.id) {
       const d = this.drag;
       d.dx = e.clientX - d.x0; d.dy = e.clientY - d.y0;
@@ -209,6 +205,7 @@ export class TouchControls {
     if (!this.active) return;
     intent.moveX = this.jx; intent.moveZ = this.jz;
     intent.attack = this.attackHeld;
+    this._pursue(intent);
     const p = this.pending;
     intent.q = p.q; intent.w = p.w; intent.e = p.e; intent.r = p.r; intent.recall = p.recall;
     if (p.useItem >= 0) intent.useItem = p.useItem;
@@ -225,6 +222,30 @@ export class TouchControls {
     }
   }
 
+  // Holding attack with the stick idle walks toward whatever we would attack, up to
+  // PURSUE_EXTRA past attack range. Any stick input cancels it the same frame.
+  _pursue(intent) {
+    this.pursuing = false;
+    if (!this.pursuit || !this.attackHeld || !this.hero || !this.world) return;
+    if (this.jx !== 0 || this.jz !== 0) return;                 // the stick always wins
+    const hero = this.hero;
+    if (!hero.alive || hero.stunned || hero.isRecalling) return;
+    let t = this._locked() ? this.target : null;
+    if (!t) {
+      assistedAim(this.world, hero, null, this.rig, 0, 0, scratch);
+      t = pickTargetNear(this.world, hero, scratch.x, scratch.z, 0.5);
+    }
+    if (!t) return;
+    if (!pursueDirection(hero, t, PURSUE_EXTRA, PURSUE_STOP, scratch)) return;
+    intent.moveX = scratch.x; intent.moveZ = scratch.z;
+    this.pursuing = true;
+  }
+
+  setPursuit(on) {
+    this.pursuit = !!on;
+    try { localStorage.setItem(PURSUIT_KEY, this.pursuit ? '1' : '0'); } catch { /* storage blocked */ }
+  }
+
   _locked() { const t = this.target; return !!(t && t.alive && t.world && !t.invulnerable); }
 
   update(dt) {
@@ -238,20 +259,7 @@ export class TouchControls {
       manualAim(this.hero, this.hero.data.abilities[d.slot], this.rig, d.dx, d.dy, FULL_PX, scratch);
       this.aimIndicator.show(this.hero, scratch.x, scratch.z);
     }
-    // Buttons: cooldown sweeps, seconds, dim when unusable.
-    const h = this.hero, ui = this.ui;
-    for (let i = 0; i < SLOTS.length; i++) {
-      const slot = SLOTS[i];
-      const def = h.data.abilities[slot];
-      const cd = h.cooldowns ? h.cooldowns[slot] : 0;
-      const total = def.cd * (1 - (h.cdr || 0)) || 1;
-      const state = h.abilityState ? h.abilityState(slot) : 'ready';
-      setButtonState(ui.skills[slot], cd > 0 ? cd / total : 0, cd, !h.alive || state === 'locked' || state === 'mana');
-    }
-    setButtonState(ui.atk, 0, 0, !h.alive);
-    setButtonState(ui.rec, 0, 0, !h.alive || h.isRecalling);
-    const pot = h.items && h.items[0] && h.items[0].consumable ? h.items[0] : null;
-    setButtonState(ui.pot, 0, 0, !pot || !h.alive, pot ? 'x' + (pot.count || 1) : 'potion');
+    refreshButtons(this.ui, this.hero);
   }
 
   setQuality(q) {
@@ -262,6 +270,7 @@ export class TouchControls {
 
   reset() {
     this.attackHeld = false; this.aimHold = 0; this.jx = 0; this.jz = 0;
+    this.pursuing = false; this.atkDrag.id = -1; this.atkDrag.on = false;
     this.target = null;
     if (this.marker) this.marker.hide();
   }

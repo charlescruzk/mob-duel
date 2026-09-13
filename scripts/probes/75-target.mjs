@@ -78,6 +78,64 @@ export default async function ({ block, restart, send, sleep }) {
       r.targetClearsOnDeath = T.target === null && T.marker.mesh.visible === false && H.intent.targetId >= 0;
       return r;
     })()`);
+    // Wild Rift / Honor of Kings drag targeting: pull the attack button toward a unit.
+    await send('Runtime.evaluate', { expression: `(() => {
+      const g = window.__game, T = g.fx.touch;
+      T.target = null; T.attackHeld = false;
+      g.hero.teleport(0, 0); g.camera.setYaw(0); g.camera.snapTo(g.hero.pos); g.camera.update(0.05, g.hero.pos);
+      g.enemy.teleport(-4.5, -4.5); g.enemy.alive = true; g.enemy.hp = g.enemy.maxHp;
+      for (let k = 0; k < 4; k++) g.step(0.05);
+      return 'ok';
+    })()` });
+    const atk2 = JSON.parse((await send('Runtime.evaluate', { expression: "(() => { const r = document.getElementById('tb-atk').getBoundingClientRect(); return JSON.stringify([r.left + r.width / 2, r.top + r.height / 2]); })()", returnByValue: true })).result.value);
+    await touch('touchStart', atk2[0], atk2[1], 11);
+    for (let i = 1; i <= 5; i++) { await touch('touchMove', atk2[0] - i * 12, atk2[1] - i * 12, 11); await sleep(16); }
+    const dragRes = (await send('Runtime.evaluate', { expression: "(() => { const T = window.__game.fx.touch; return JSON.stringify({ locked: T.target === window.__game.enemy, drags: T.stats.dragLocks, held: T.attackHeld }); })()", returnByValue: true })).result.value;
+    await touch('touchEnd', atk2[0] - 60, atk2[1] - 60, 11);
+    await block('target: dragging the attack button locks the unit in that direction', `(() => {
+      const d = ${dragRes};
+      const T = window.__game.fx.touch;
+      return {
+        dragAttackLocksTarget: d.locked === true && d.drags >= 1,
+        dragAttackKeepsAttacking: d.held === true,
+        dragLockSurvivesRelease: T.target === window.__game.enemy && T.attackHeld === false,
+      };
+    })()`);
+
+    // Pursuit, as Mobile Legends / Honor of Kings / Wild Rift do it: holding attack
+    // walks into range, the stick overrides it, and it never chases far.
+    await block('target: close pursuit walks into range, the stick always wins', `(async () => {
+      const g = window.__game, H = g.hero, E = g.enemy, T = g.fx.touch; const r = {};
+      const I = H.intent;
+      g.match.controller = g.controller; g.controller.enabled = true;
+      H.abilities.resetAll(); H.hp = H.maxHp; H.mp = H.maxMp;
+      E.alive = true; E.hp = E.maxHp;
+      // Out of Kazane's 8 m range but inside the 5 m leash.
+      H.teleport(0, 0); E.teleport(0, -11.5); T.target = E; T.attackHeld = true; T.jx = 0; T.jz = 0;
+      const z0 = H.pos.z;
+      for (let k = 0; k < 30; k++) g.step(0.05);
+      r.pursuitWalksIntoRange = H.pos.z < z0 - 1.5 && T.pursuing === false && E.hp < E.maxHp;
+      r.pursuitStopsInRange = Math.abs(H.pos.z - E.pos.z) <= H.attackRange + 0.01;
+      // The stick overrides pursuit the same frame.
+      T.jx = 1; T.jz = 0;
+      const x0 = H.pos.x;
+      for (let k = 0; k < 10; k++) g.step(0.05);
+      r.stickOverridesPursuit = H.pos.x > x0 + 1 && T.pursuing === false;
+      T.jx = 0; T.jz = 0;
+      // Beyond the leash it refuses to chase.
+      H.teleport(0, 0); E.teleport(0, -20); E.hp = E.maxHp;
+      const z1 = H.pos.z;
+      for (let k = 0; k < 20; k++) g.step(0.05);
+      r.pursuitRespectsLeash = Math.abs(H.pos.z - z1) < 0.05;
+      // ...and the pause-menu toggle turns it off entirely.
+      T.setPursuit(false);
+      H.teleport(0, 0); E.teleport(0, -11.5);
+      for (let k = 0; k < 20; k++) g.step(0.05);
+      r.pursuitToggleOff = Math.abs(H.pos.z) < 0.05;
+      r.pursuitTogglePersists = localStorage.getItem('mobaDuel.pursuit') === '0';
+      T.setPursuit(true); T.attackHeld = false; T.target = null;
+      return r;
+    })()`);
   } finally {
     await send('Emulation.setTouchEmulationEnabled', { enabled: false });
     await send('Emulation.clearDeviceMetricsOverride');

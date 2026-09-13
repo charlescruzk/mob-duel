@@ -113,7 +113,10 @@ async function main() {
       const v = r.result.value;
       console.log(v);
       if (v && typeof v === 'object') {
-        for (const [k, val] of Object.entries(v)) if (val === false) { exitCode = 1; console.log(`  ✗ ${k}`); }
+        const keys = Object.entries(v);
+        // An empty object means the page threw: CDP serialises an Error by value as {}.
+        if (keys.length === 0) { exitCode = 1; console.log('  ✗ block returned {} — the page threw (check window.__game booted)'); }
+        for (const [k, val] of keys) if (val === false) { exitCode = 1; console.log(`  ✗ ${k}`); }
         if (v.error) exitCode = 1;
       }
     } else {
