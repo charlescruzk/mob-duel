@@ -2,6 +2,7 @@
 // deltas while pointer-locked, camera 7 m behind a smoothed pivot at eye height.
 // Exposes yaw, pitch, forwardX/Z, rightX/Z (XZ unit vectors) for the controller.
 import * as THREE from 'three';
+import { HEIGHTS } from '../../sim/map/laneData.js';
 
 const YAW_SENS = 0.0022;                   // rad / px
 const PITCH_SENS = 0.0022;
@@ -17,6 +18,8 @@ const OCCLUDER_PAD = 0.9;                  // metres kept between the camera and
 const BOOM_STEP = 0.5;
 const BOOM_MIN = 2.0;
 const BOOM_SMOOTH = 10;
+const PITCH_STEP = 0.12;                   // rad per candidate when steepening over a structure
+const PITCH_SMOOTH = 8;
 
 export class ThirdPersonCamera {
   constructor(camera, input) {
@@ -33,6 +36,8 @@ export class ThirdPersonCamera {
     this._shakeDur = 1;
     this.occluders = [];                   // { x, z, r }: towers and nexuses the boom must stay out of
     this.dist = DISTANCE;                  // current boom length (shortened near occluders)
+    this.pitchEff = PITCH_DEFAULT;         // pitch actually used: steepened to clear a structure
+    this._wantPitch = PITCH_DEFAULT;
     this._updateBasis();
   }
 
@@ -83,15 +88,20 @@ export class ThirdPersonCamera {
       this.pivot.z += (targetPos.z - this.pivot.z) * k;
     }
 
-    const cp = Math.cos(this.pitch);
-    const sp = Math.sin(this.pitch);          // negative when looking down
     const cam = this.camera;
-    // Boom: 7 m unless a structure sits on it; then the shortest clear length,
-    // eased so the camera never pops.
-    const want = this._clearBoom(cp);
+    // Boom: 7 m at the player's pitch unless a structure sits on it; then first
+    // steepen the pitch (the camera rises over the structure), and only if that
+    // cannot clear it shorten the boom. Eased so the camera never pops.
+    const want = this._clearRig();
     const kb = 1 - Math.exp(-BOOM_SMOOTH * dt);
-    if (snapped) this.dist = want;                                     // a snap moves the whole rig
-    else this.dist += (want - this.dist) * (want < this.dist ? 1 : kb); // pull in instantly, ease out
+    const kp = 1 - Math.exp(-PITCH_SMOOTH * dt);
+    if (snapped) { this.dist = want; this.pitchEff = this._wantPitch; }
+    else {
+      this.dist += (want - this.dist) * (want < this.dist ? 1 : kb);      // pull in instantly, ease out
+      this.pitchEff += (this._wantPitch - this.pitchEff) * (this._wantPitch < this.pitchEff ? 1 : kp);
+    }
+    const cp = Math.cos(this.pitchEff);
+    const sp = Math.sin(this.pitchEff);       // negative when looking down
     const D = this.dist;
     cam.position.x = this.pivot.x - this.forwardX * D * cp;
     cam.position.y = this.pivot.y + EYE_HEIGHT - sp * D;
@@ -110,22 +120,30 @@ export class ThirdPersonCamera {
     }
   }
 
-  // Longest boom (≤ DISTANCE) whose camera point stays OCCLUDER_PAD outside every
-  // occluder circle in XZ. Steps of BOOM_STEP; no allocation.
-  _clearBoom(cp) {
+  // Longest boom (≤ DISTANCE) at the least-steepened pitch whose camera point is
+  // either OCCLUDER_PAD outside every occluder circle (XZ) or above its top. Sets
+  // _wantPitch and returns the boom length. Steps of BOOM_STEP / PITCH_STEP; no allocation.
+  _clearRig() {
     const occ = this.occluders;
+    this._wantPitch = this.pitch;
     if (!occ.length) return DISTANCE;
     for (let d = DISTANCE; d > BOOM_MIN; d -= BOOM_STEP) {
-      const cx = this.pivot.x - this.forwardX * d * cp;
-      const cz = this.pivot.z - this.forwardZ * d * cp;
-      let clear = true;
-      for (let i = 0; i < occ.length; i++) {
-        const o = occ[i];
-        const dx = cx - o.x, dz = cz - o.z, rr = o.r + OCCLUDER_PAD;
-        if (dx * dx + dz * dz < rr * rr) { clear = false; break; }
+      for (let p = this.pitch; p >= PITCH_MIN - 1e-6; p -= PITCH_STEP) {
+        const cp = Math.cos(p), sp = Math.sin(p);
+        const cx = this.pivot.x - this.forwardX * d * cp;
+        const cz = this.pivot.z - this.forwardZ * d * cp;
+        const cy = this.pivot.y + EYE_HEIGHT - sp * d;
+        let clear = true;
+        for (let i = 0; i < occ.length; i++) {
+          const o = occ[i];
+          if (cy > o.h) continue;
+          const dx = cx - o.x, dz = cz - o.z, rr = o.r + OCCLUDER_PAD;
+          if (dx * dx + dz * dz < rr * rr) { clear = false; break; }
+        }
+        if (clear) { this._wantPitch = p; return d; }
       }
-      if (clear) return d;
     }
+    this._wantPitch = PITCH_MIN;
     return BOOM_MIN;
   }
 
@@ -135,7 +153,7 @@ export class ThirdPersonCamera {
     const units = world.units;
     for (let i = 0; i < units.length; i++) {
       const u = units[i];
-      if (u.isStatic) this.occluders.push({ x: u.pos.x, z: u.pos.z, r: u.radius });
+      if (u.isStatic) this.occluders.push({ x: u.pos.x, z: u.pos.z, r: u.radius, h: (u.kind === 'nexus' ? HEIGHTS.nexus + 0.6 : HEIGHTS.tower) + 0.6 });
     }
   }
 
